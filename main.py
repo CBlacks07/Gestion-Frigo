@@ -21,9 +21,6 @@ def main():
     app.setOrganizationName("Gestion-Frigo")
     app.setApplicationVersion("1.0.0")
 
-    # Activer le support High DPI
-    app.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps)
-
     # Créer et afficher la fenêtre principale
     window = MainWindow()
     window.show()
