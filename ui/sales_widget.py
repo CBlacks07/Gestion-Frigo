@@ -1,8 +1,5 @@
 """Widget de gestion des ventes et factures."""
 from datetime import datetime
-import os
-import subprocess
-import platform
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QDialog, QFormLayout, QLineEdit, QComboBox,
@@ -15,6 +12,7 @@ from PyQt6.QtGui import QColor
 from database.db_manager import DatabaseManager
 from database.models import Sale, SaleItem
 from utils.reports import ReportGenerator
+from utils.html_printer import HTMLPrinter
 
 
 class SalesWidget(QWidget):
@@ -25,6 +23,7 @@ class SalesWidget(QWidget):
         super().__init__()
         self.db = db
         self.report_generator = report_generator
+        self.html_printer = HTMLPrinter(db, self)
         self._create_ui()
         self.refresh_data()
 
@@ -171,39 +170,11 @@ class SalesWidget(QWidget):
         QMessageBox.information(self, f"Détails de la vente #{sale.id}", details)
 
     def _generate_invoice(self, sale: Sale):
-        """Génère une facture PDF pour la vente et lance l'impression automatique."""
+        """Affiche l'aperçu d'impression de la facture."""
         try:
-            pdf_path = self.report_generator.generate_invoice_pdf(sale.id)
-
-            # Impression automatique
-            if os.path.exists(pdf_path):
-                system = platform.system()
-                try:
-                    if system == "Windows":
-                        # Windows: Utiliser l'imprimante par défaut
-                        os.startfile(pdf_path, "print")
-                    elif system == "Darwin":  # macOS
-                        subprocess.run(["lpr", pdf_path], check=False)
-                    else:  # Linux
-                        subprocess.run(["lp", pdf_path], check=False)
-
-                    QMessageBox.information(
-                        self,
-                        "Succès",
-                        f"Facture générée et envoyée à l'impression!\n\nEmplacement: {pdf_path}"
-                    )
-                except Exception as print_error:
-                    QMessageBox.warning(
-                        self,
-                        "Facture générée",
-                        f"Facture générée avec succès mais erreur d'impression: {str(print_error)}\n\nEmplacement: {pdf_path}"
-                    )
-
-                # Ouvrir le fichier PDF
-                os.system(f'xdg-open "{pdf_path}" 2>/dev/null || open "{pdf_path}" 2>/dev/null || start "{pdf_path}" 2>/dev/null')
-
+            self.html_printer.print_invoice(sale.id)
         except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Erreur lors de la génération de la facture: {str(e)}")
+            QMessageBox.critical(self, "Erreur", f"Erreur lors de l'impression de la facture: {str(e)}")
 
 
 class SaleDialog(QDialog):
