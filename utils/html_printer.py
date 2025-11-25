@@ -1,10 +1,10 @@
-"""Module d'impression HTML utilisant la méthode du navigateur."""
+"""Module d'impression de tickets de caisse."""
 from datetime import datetime
 from typing import Optional
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QPushButton, QHBoxLayout
 from PyQt6.QtPrintSupport import QPrintPreviewDialog, QPrinter
-from PyQt6.QtGui import QTextDocument
-from PyQt6.QtCore import Qt, QSizeF
+from PyQt6.QtGui import QTextDocument, QPageSize, QPageLayout
+from PyQt6.QtCore import Qt, QSizeF, QMarginsF
 
 from database.models import Sale, Client
 from database.db_manager import DatabaseManager
@@ -28,8 +28,8 @@ class HTMLPrinter:
         }
         return methods.get(method, method)
 
-    def generate_invoice_html(self, sale_id: int, company_info: Optional[dict] = None) -> str:
-        """Génère le HTML d'une facture."""
+    def generate_receipt_html(self, sale_id: int, company_info: Optional[dict] = None) -> str:
+        """Génère le HTML d'un ticket de caisse."""
         # Récupérer les données
         sale = self.db.get_sale(sale_id)
         if not sale:
@@ -43,177 +43,153 @@ class HTMLPrinter:
             company_info = {
                 'name': 'Gestion-Frigo',
                 'address': 'Adresse de votre entreprise',
-                'city': 'Ville',
-                'postal_code': '00000',
                 'phone': 'Téléphone',
-                'email': 'email@entreprise.com',
-                'siret': 'N° SIRET'
             }
 
-        invoice_number = f"INV-{sale_id:06d}"
+        receipt_number = f"{sale_id:06d}"
 
-        # Générer le HTML
+        # Générer le HTML style ticket de caisse
         html = f"""
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
-            <title>Facture {invoice_number}</title>
+            <title>Ticket {receipt_number}</title>
             <style>
+                @page {{
+                    size: 80mm auto;
+                    margin: 0;
+                }}
                 body {{
-                    font-family: Arial, sans-serif;
-                    margin: 20px;
-                    color: #333;
+                    font-family: 'Courier New', Courier, monospace;
+                    font-size: 11px;
+                    margin: 0;
+                    padding: 5mm;
+                    width: 70mm;
+                    color: #000;
+                }}
+                .center {{
+                    text-align: center;
+                }}
+                .bold {{
+                    font-weight: bold;
                 }}
                 .header {{
                     text-align: center;
-                    margin-bottom: 30px;
-                }}
-                .header h1 {{
-                    color: #2c3e50;
-                    font-size: 28px;
                     margin-bottom: 10px;
+                    border-bottom: 1px dashed #000;
+                    padding-bottom: 5px;
                 }}
-                .info-section {{
-                    display: table;
-                    width: 100%;
-                    margin-bottom: 30px;
-                }}
-                .info-column {{
-                    display: table-cell;
-                    width: 50%;
-                    vertical-align: top;
-                }}
-                .info-column h3 {{
-                    color: #2c3e50;
-                    margin-bottom: 10px;
-                }}
-                .invoice-details {{
-                    background-color: #f8f9fa;
-                    padding: 15px;
-                    margin-bottom: 20px;
-                    border-left: 4px solid #3498db;
-                }}
-                table {{
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-bottom: 20px;
-                }}
-                th {{
-                    background-color: #3498db;
-                    color: white;
-                    padding: 12px;
-                    text-align: left;
-                }}
-                td {{
-                    padding: 10px;
-                    border-bottom: 1px solid #ddd;
-                }}
-                tr:nth-child(even) {{
-                    background-color: #f8f9fa;
-                }}
-                .total-row {{
-                    background-color: #3498db;
-                    color: white;
+                .company-name {{
+                    font-size: 14px;
                     font-weight: bold;
-                    font-size: 16px;
+                    margin-bottom: 3px;
                 }}
-                .total-row td {{
-                    padding: 15px;
-                    border: none;
+                .separator {{
+                    border-top: 1px dashed #000;
+                    margin: 5px 0;
+                }}
+                .double-separator {{
+                    border-top: 2px solid #000;
+                    margin: 5px 0;
+                }}
+                .item-line {{
+                    display: flex;
+                    justify-content: space-between;
+                    margin: 3px 0;
+                }}
+                .item-name {{
+                    flex: 1;
+                }}
+                .item-qty {{
+                    width: 30px;
+                    text-align: right;
+                }}
+                .item-price {{
+                    width: 60px;
+                    text-align: right;
+                }}
+                .total-line {{
+                    font-size: 13px;
+                    font-weight: bold;
+                    margin-top: 8px;
+                    display: flex;
+                    justify-content: space-between;
                 }}
                 .footer {{
-                    margin-top: 50px;
                     text-align: center;
-                    color: #7f8c8d;
-                    font-size: 12px;
-                    border-top: 1px solid #ddd;
-                    padding-top: 15px;
+                    margin-top: 10px;
+                    font-size: 10px;
+                    border-top: 1px dashed #000;
+                    padding-top: 5px;
                 }}
-                .notes {{
-                    background-color: #fff3cd;
-                    padding: 15px;
-                    margin-top: 20px;
-                    border-left: 4px solid #ffc107;
+                .small {{
+                    font-size: 9px;
                 }}
             </style>
         </head>
         <body>
             <div class="header">
-                <h1>FACTURE</h1>
+                <div class="company-name">{company_info['name']}</div>
+                <div class="small">{company_info['address']}</div>
+                <div class="small">Tél: {company_info['phone']}</div>
             </div>
 
-            <div class="info-section">
-                <div class="info-column">
-                    <h3>{company_info['name']}</h3>
-                    <p>{company_info['address']}<br>
-                    {company_info['postal_code']} {company_info['city']}<br>
-                    Tél: {company_info['phone']}<br>
-                    Email: {company_info['email']}</p>
-                </div>
-                <div class="info-column">
-                    <h3>Client</h3>
-                    <p><strong>{client.name if client else "Client inconnu"}</strong><br>
-                    {client.company if client and client.company else ""}<br>
-                    {client.address if client else ""}<br>
-                    {f"{client.postal_code} {client.city}" if client else ""}</p>
-                </div>
+            <div class="center small">
+                Ticket N°: {receipt_number}<br>
+                {sale.sale_date.strftime('%d/%m/%Y %H:%M') if sale.sale_date else datetime.now().strftime('%d/%m/%Y %H:%M')}<br>
+                Client: {client.name if client else "Client"}<br>
+                Paiement: {self._get_payment_method_label(sale.payment_method)}
             </div>
 
-            <div class="invoice-details">
-                <strong>N° Facture:</strong> {invoice_number}<br>
-                <strong>Date:</strong> {sale.sale_date.strftime('%d/%m/%Y') if sale.sale_date else datetime.now().strftime('%d/%m/%Y')}<br>
-                <strong>Mode de paiement:</strong> {self._get_payment_method_label(sale.payment_method)}
-            </div>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>Produit</th>
-                        <th style="text-align: right;">Quantité</th>
-                        <th style="text-align: right;">Prix unitaire</th>
-                        <th style="text-align: right;">Remise</th>
-                        <th style="text-align: right;">Total</th>
-                    </tr>
-                </thead>
-                <tbody>
+            <div class="separator"></div>
         """
 
+        # Articles
         for item in items:
             product = self.db.get_product(item.product_id)
             product_name = product.name if product else f"Produit #{item.product_id}"
-            unit = product.unit if product else ''
+
+            # Limiter le nom à 25 caractères
+            if len(product_name) > 25:
+                product_name = product_name[:22] + "..."
 
             html += f"""
-                    <tr>
-                        <td>{product_name}</td>
-                        <td style="text-align: right;">{int(item.quantity)} {unit}</td>
-                        <td style="text-align: right;">{int(item.unit_price)} CFA</td>
-                        <td style="text-align: right;">{"" if item.discount == 0 else f"{int(item.discount)} CFA"}</td>
-                        <td style="text-align: right;">{int(item.subtotal)} CFA</td>
-                    </tr>
-            """
-
-        html += f"""
-                    <tr class="total-row">
-                        <td colspan="4" style="text-align: right;">TOTAL</td>
-                        <td style="text-align: right;">{int(sale.total_amount)} CFA</td>
-                    </tr>
-                </tbody>
-            </table>
-        """
-
-        if sale.notes:
-            html += f"""
-            <div class="notes">
-                <strong>Notes:</strong> {sale.notes}
+            <div style="margin: 3px 0;">
+                <div>{product_name}</div>
+                <div style="display: flex; justify-content: space-between; margin-left: 10px;">
+                    <span>{int(item.quantity)} x {int(item.unit_price)} CFA</span>
+                    <span class="bold">{int(item.subtotal)} CFA</span>
+                </div>
             </div>
             """
 
+        # Total
+        html += f"""
+            <div class="double-separator"></div>
+            <div class="total-line">
+                <span>TOTAL A PAYER</span>
+                <span>{int(sale.total_amount)} CFA</span>
+            </div>
+            <div class="double-separator"></div>
+        """
+
+        # Notes si présentes
+        if sale.notes:
+            html += f"""
+            <div class="center small" style="margin-top: 5px;">
+                Note: {sale.notes}
+            </div>
+            """
+
+        # Footer
         html += f"""
             <div class="footer">
-                Merci pour votre confiance<br>
-                {company_info['name']} - SIRET: {company_info['siret']}
+                Merci de votre visite !<br>
+                A bientôt<br>
+                <div class="small" style="margin-top: 5px;">
+                    Ce ticket fait office de facture
+                </div>
             </div>
         </body>
         </html>
@@ -371,26 +347,51 @@ class HTMLPrinter:
 
         return html
 
-    def print_invoice(self, sale_id: int, company_info: Optional[dict] = None):
-        """Affiche l'aperçu d'impression pour une facture."""
-        html = self.generate_invoice_html(sale_id, company_info)
-        self._show_print_preview(html, f"Facture INV-{sale_id:06d}")
+    def print_receipt(self, sale_id: int, company_info: Optional[dict] = None):
+        """Affiche l'aperçu d'impression pour un ticket de caisse."""
+        html = self.generate_receipt_html(sale_id, company_info)
+        self._show_receipt_preview(html, f"Ticket N°{sale_id:06d}")
 
     def print_stock_report(self):
         """Affiche l'aperçu d'impression pour un rapport de stock."""
         html = self.generate_stock_report_html()
         self._show_print_preview(html, "Rapport de Stock")
 
+    def _show_receipt_preview(self, html: str, title: str):
+        """Affiche l'aperçu d'impression pour un ticket de caisse."""
+        # Créer un document texte avec le HTML
+        document = QTextDocument()
+        document.setHtml(html)
+
+        # Créer un QPrinter configuré pour ticket de caisse (80mm)
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+
+        # Configuration pour ticket thermique 80mm
+        page_size = QPageSize(QSizeF(80, 297), QPageSize.Unit.Millimeter)  # 80mm de large, hauteur variable
+        printer.setPageSize(page_size)
+        printer.setPageOrientation(QPrinter.PageOrientation.Portrait)
+
+        # Marges minimales
+        printer.setPageMargins(QMarginsF(2, 2, 2, 2), QPageLayout.Unit.Millimeter)
+
+        # Créer le dialogue d'aperçu d'impression
+        preview = QPrintPreviewDialog(printer, self.parent)
+        preview.setWindowTitle(f"Aperçu d'impression - {title}")
+        preview.paintRequested.connect(lambda p: document.print(p))
+
+        # Afficher le dialogue
+        preview.exec()
+
     def _show_print_preview(self, html: str, title: str):
-        """Affiche l'aperçu d'impression avec le HTML fourni."""
+        """Affiche l'aperçu d'impression avec le HTML fourni (format A4)."""
         # Créer un document texte avec le HTML
         document = QTextDocument()
         document.setHtml(html)
 
         # Créer un QPrinter
         printer = QPrinter(QPrinter.PrinterMode.HighResolution)
-        printer.setPageSize(QPrinter.PageSize.A4)
-        printer.setPageMargins(15, 15, 15, 15, QPrinter.Unit.Millimeter)
+        printer.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
+        printer.setPageMargins(QMarginsF(15, 15, 15, 15), QPageLayout.Unit.Millimeter)
 
         # Créer le dialogue d'aperçu d'impression
         preview = QPrintPreviewDialog(printer, self.parent)

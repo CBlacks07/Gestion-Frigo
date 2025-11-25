@@ -98,8 +98,8 @@ class SalesWidget(QWidget):
             action_layout = QHBoxLayout(action_widget)
             action_layout.setContentsMargins(0, 0, 0, 0)
 
-            invoice_btn = QPushButton("📄")
-            invoice_btn.setToolTip("Générer facture")
+            invoice_btn = QPushButton("🧾")
+            invoice_btn.setToolTip("Imprimer ticket")
             invoice_btn.setMaximumWidth(40)
             invoice_btn.clicked.connect(lambda checked, s=sale: self._generate_invoice(s))
 
@@ -170,11 +170,11 @@ class SalesWidget(QWidget):
         QMessageBox.information(self, f"Détails de la vente #{sale.id}", details)
 
     def _generate_invoice(self, sale: Sale):
-        """Affiche l'aperçu d'impression de la facture."""
+        """Affiche l'aperçu d'impression du ticket de caisse."""
         try:
-            self.html_printer.print_invoice(sale.id)
+            self.html_printer.print_receipt(sale.id)
         except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Erreur lors de l'impression de la facture: {str(e)}")
+            QMessageBox.critical(self, "Erreur", f"Erreur lors de l'impression du ticket: {str(e)}")
 
 
 class SaleDialog(QDialog):
