@@ -10,7 +10,7 @@ pip install pyinstaller
 
 echo.
 echo Construction de l'executable...
-pyinstaller build_installer.spec --clean
+python -m PyInstaller build_installer.spec --clean
 
 echo.
 echo ========================================
