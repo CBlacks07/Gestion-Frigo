@@ -230,9 +230,9 @@ class ProductDialog(QDialog):
         if index >= 0:
             self.unit_combo.setCurrentIndex(index)
 
-        self.current_stock_input.setValue(self.product.current_stock)
-        self.min_stock_input.setValue(self.product.min_stock)
-        self.unit_price_input.setValue(self.product.unit_price)
+        self.current_stock_input.setValue(int(self.product.current_stock))
+        self.min_stock_input.setValue(int(self.product.min_stock))
+        self.unit_price_input.setValue(int(self.product.unit_price))
 
         if self.product.supplier_id:
             for i in range(self.supplier_combo.count()):

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import os
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QGroupBox, QGridLayout, QMessageBox, QComboBox, QTextEdit
+    QGroupBox, QGridLayout, QMessageBox, QComboBox, QTextEdit, QScrollArea
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -11,6 +11,7 @@ from PyQt6.QtGui import QFont
 from database.db_manager import DatabaseManager
 from utils.alerts import AlertManager
 from utils.reports import ReportGenerator
+from utils.html_printer import HTMLPrinter
 
 
 class StatsWidget(QWidget):
@@ -22,13 +23,20 @@ class StatsWidget(QWidget):
         self.db = db
         self.alert_manager = alert_manager
         self.report_generator = report_generator
+        self.html_printer = HTMLPrinter(db, self)
         self._create_ui()
         self.refresh_data()
 
     def _create_ui(self):
         """Crée l'interface utilisateur."""
+        # Layout principal
+        main_layout = QVBoxLayout()
+        self.setLayout(main_layout)
+
+        # Créer un widget de contenu pour le scroll area
+        content_widget = QWidget()
         layout = QVBoxLayout()
-        self.setLayout(layout)
+        content_widget.setLayout(layout)
 
         # En-tête
         header_label = QLabel("📊 Tableau de Bord et Statistiques")
@@ -85,7 +93,7 @@ class StatsWidget(QWidget):
         alerts_layout = QVBoxLayout()
         self.alerts_text = QTextEdit()
         self.alerts_text.setReadOnly(True)
-        self.alerts_text.setMaximumHeight(200)
+        self.alerts_text.setMinimumHeight(150)
         alerts_layout.addWidget(self.alerts_text)
         alerts_group.setLayout(alerts_layout)
         layout.addWidget(alerts_group)
@@ -95,7 +103,7 @@ class StatsWidget(QWidget):
         top_products_layout = QVBoxLayout()
         self.top_products_text = QTextEdit()
         self.top_products_text.setReadOnly(True)
-        self.top_products_text.setMaximumHeight(200)
+        self.top_products_text.setMinimumHeight(150)
         top_products_layout.addWidget(self.top_products_text)
         top_products_group.setLayout(top_products_layout)
         layout.addWidget(top_products_group)
@@ -105,7 +113,7 @@ class StatsWidget(QWidget):
         top_clients_layout = QVBoxLayout()
         self.top_clients_text = QTextEdit()
         self.top_clients_text.setReadOnly(True)
-        self.top_clients_text.setMaximumHeight(200)
+        self.top_clients_text.setMinimumHeight(150)
         top_clients_layout.addWidget(self.top_clients_text)
         top_clients_group.setLayout(top_clients_layout)
         layout.addWidget(top_clients_group)
@@ -128,13 +136,20 @@ class StatsWidget(QWidget):
 
         self.sales_period_text = QTextEdit()
         self.sales_period_text.setReadOnly(True)
-        self.sales_period_text.setMaximumHeight(150)
+        self.sales_period_text.setMinimumHeight(120)
         sales_period_layout.addWidget(self.sales_period_text)
 
         sales_period_group.setLayout(sales_period_layout)
         layout.addWidget(sales_period_group)
 
-        layout.addStretch()
+        # Ajouter le widget de contenu dans un scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidget(content_widget)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+        main_layout.addWidget(scroll_area)
 
     def _create_kpi_label(self, text: str) -> QLabel:
         """Crée un label stylisé pour les KPI."""
@@ -247,18 +262,8 @@ class StatsWidget(QWidget):
             self.sales_period_text.setHtml(html)
 
     def _export_stock_report(self):
-        """Exporte un rapport de stock en PDF."""
+        """Affiche l'aperçu d'impression du rapport de stock."""
         try:
-            pdf_path = self.report_generator.generate_stock_report()
-            QMessageBox.information(
-                self,
-                "Succès",
-                f"Rapport de stock généré avec succès!\n\nEmplacement: {pdf_path}"
-            )
-
-            # Ouvrir le fichier PDF si possible
-            if os.path.exists(pdf_path):
-                os.system(f'xdg-open "{pdf_path}" 2>/dev/null || open "{pdf_path}" 2>/dev/null || start "{pdf_path}" 2>/dev/null')
-
+            self.html_printer.print_stock_report()
         except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Erreur lors de la génération du rapport: {str(e)}")
+            QMessageBox.critical(self, "Erreur", f"Erreur lors de l'impression du rapport: {str(e)}")
