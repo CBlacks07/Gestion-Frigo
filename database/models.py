@@ -108,3 +108,33 @@ class Invoice:
     status: str = "UNPAID"  # UNPAID, PAID, OVERDUE, CANCELLED
     pdf_path: str = ""
     created_at: Optional[datetime] = None
+
+
+@dataclass
+class User:
+    """Modèle pour un utilisateur."""
+    id: Optional[int] = None
+    username: str = ""
+    password_hash: str = ""
+    full_name: str = ""
+    role: str = "USER"  # USER ou ADMIN
+    is_active: bool = True
+    created_at: Optional[datetime] = None
+    last_login: Optional[datetime] = None
+
+
+@dataclass
+class AppSettings:
+    """Modèle pour les paramètres de l'application."""
+    id: Optional[int] = None
+    company_name: str = "Gestion-Frigo"
+    company_address: str = ""
+    company_phone: str = ""
+    company_email: str = ""
+    logo_path: str = ""
+    primary_color: str = "#2980b9"
+    show_address_on_receipt: bool = True
+    show_phone_on_receipt: bool = True
+    show_email_on_receipt: bool = False
+    receipt_footer_text: str = "Merci de votre visite !"
+    updated_at: Optional[datetime] = None

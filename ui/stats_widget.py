@@ -11,7 +11,6 @@ from PyQt6.QtGui import QFont
 from database.db_manager import DatabaseManager
 from utils.alerts import AlertManager
 from utils.reports import ReportGenerator
-from utils.html_printer import HTMLPrinter
 
 
 class StatsWidget(QWidget):
@@ -23,7 +22,6 @@ class StatsWidget(QWidget):
         self.db = db
         self.alert_manager = alert_manager
         self.report_generator = report_generator
-        self.html_printer = HTMLPrinter(db, self)
         self._create_ui()
         self.refresh_data()
 
@@ -262,8 +260,18 @@ class StatsWidget(QWidget):
             self.sales_period_text.setHtml(html)
 
     def _export_stock_report(self):
-        """Affiche l'aperçu d'impression du rapport de stock."""
+        """Exporte un rapport de stock en PDF."""
         try:
-            self.html_printer.print_stock_report()
+            pdf_path = self.report_generator.generate_stock_report()
+            QMessageBox.information(
+                self,
+                "Succès",
+                f"Rapport de stock généré avec succès!\n\nEmplacement: {pdf_path}"
+            )
+
+            # Ouvrir le fichier PDF si possible
+            if os.path.exists(pdf_path):
+                os.system(f'xdg-open "{pdf_path}" 2>/dev/null || open "{pdf_path}" 2>/dev/null || start "{pdf_path}" 2>/dev/null')
+
         except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Erreur lors de l'impression du rapport: {str(e)}")
+            QMessageBox.critical(self, "Erreur", f"Erreur lors de la génération du rapport: {str(e)}")
