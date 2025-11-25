@@ -152,6 +152,15 @@ class MainWindow(QMainWindow):
         QPushButton {{
             padding: 5px 10px;
             border-radius: 3px;
+            border: 1px solid #ccc;
+            background-color: #f8f9fa;
+        }}
+        QPushButton:hover {{
+            background-color: #e9ecef;
+            border: 1px solid {color};
+        }}
+        QPushButton:pressed {{
+            background-color: #dee2e6;
         }}
         QGroupBox {{
             font-weight: bold;
