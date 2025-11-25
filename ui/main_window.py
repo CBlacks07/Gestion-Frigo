@@ -7,6 +7,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QIcon
 
 from database.db_manager import DatabaseManager
+from database.models import User
 from utils.alerts import AlertManager
 from utils.reports import ReportGenerator
 
@@ -15,14 +16,18 @@ from .clients_widget import ClientsWidget
 from .suppliers_widget import SuppliersWidget
 from .sales_widget import SalesWidget
 from .stats_widget import StatsWidget
+from .settings_widget import SettingsWidget
 
 
 class MainWindow(QMainWindow):
     """Fenêtre principale de l'application."""
 
-    def __init__(self):
+    def __init__(self, current_user: User):
         """Initialise la fenêtre principale."""
         super().__init__()
+
+        # Utilisateur connecté
+        self.current_user = current_user
 
         # Initialiser les gestionnaires
         self.db = DatabaseManager()
@@ -30,7 +35,8 @@ class MainWindow(QMainWindow):
         self.report_generator = ReportGenerator(self.db)
 
         # Configuration de la fenêtre
-        self.setWindowTitle("Gestion-Frigo - Gestion de Stock Professionnel")
+        app_settings = self.db.get_app_settings()
+        self.setWindowTitle(f"{app_settings.company_name} - Gestion de Stock")
         self.setMinimumSize(1200, 800)
 
         # Créer l'interface
@@ -67,6 +73,11 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.clients_widget, "👥 Clients")
         self.tabs.addTab(self.suppliers_widget, "🏢 Fournisseurs")
 
+        # Onglet Paramètres (seulement pour admin)
+        if self.current_user.role == "ADMIN":
+            self.settings_widget = SettingsWidget(self.db, self.current_user)
+            self.tabs.addTab(self.settings_widget, "⚙️ Paramètres")
+
         # Connecter les signaux
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
@@ -80,7 +91,7 @@ class MainWindow(QMainWindow):
         self.statusbar.addPermanentWidget(self.alert_label)
 
         # Label pour les informations
-        self.info_label = QLabel("Prêt")
+        self.info_label = QLabel(f"Connecté: {self.current_user.full_name} ({self.current_user.role})")
         self.statusbar.addWidget(self.info_label)
 
     def _on_tab_changed(self, index):

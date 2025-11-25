@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 from pathlib import Path
 
-from .models import Product, StockMovement, Client, Supplier, Sale, SaleItem, Invoice
+from .models import Product, StockMovement, Client, Supplier, Sale, SaleItem, Invoice, User, AppSettings
+import hashlib
 
 
 class DatabaseManager:
@@ -158,6 +159,38 @@ class DatabaseManager:
             )
         """)
 
+        # Table des utilisateurs
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                full_name TEXT NOT NULL,
+                role TEXT DEFAULT 'USER' CHECK(role IN ('USER', 'ADMIN')),
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP
+            )
+        """)
+
+        # Table des paramètres de l'application
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS app_settings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_name TEXT DEFAULT 'Gestion-Frigo',
+                company_address TEXT DEFAULT '',
+                company_phone TEXT DEFAULT '',
+                company_email TEXT DEFAULT '',
+                logo_path TEXT DEFAULT '',
+                primary_color TEXT DEFAULT '#2980b9',
+                show_address_on_receipt INTEGER DEFAULT 1,
+                show_phone_on_receipt INTEGER DEFAULT 1,
+                show_email_on_receipt INTEGER DEFAULT 0,
+                receipt_footer_text TEXT DEFAULT 'Merci de votre visite !',
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         # Index pour améliorer les performances
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_category ON products(category)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON stock_movements(product_id)")
@@ -167,6 +200,9 @@ class DatabaseManager:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_sale ON invoices(sale_id)")
 
         conn.commit()
+
+        # Initialiser les données par défaut
+        self._initialize_default_data()
 
     # --- Gestion des produits ---
 
@@ -583,3 +619,182 @@ class DatabaseManager:
         """, (limit,))
 
         return [(row[0], row[1]) for row in cursor.fetchall()]
+
+    # --- Gestion des utilisateurs ---
+
+    def _initialize_default_data(self):
+        """Initialise les données par défaut (admin et paramètres)."""
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        # Vérifier si l'utilisateur admin existe
+        cursor.execute("SELECT COUNT(*) FROM users WHERE username = 'admin'")
+        if cursor.fetchone()[0] == 0:
+            # Créer l'utilisateur admin par défaut (mot de passe: admin)
+            admin_password = self._hash_password("admin")
+            cursor.execute("""
+                INSERT INTO users (username, password_hash, full_name, role)
+                VALUES ('admin', ?, 'Administrateur', 'ADMIN')
+            """, (admin_password,))
+
+        # Vérifier si les paramètres existent
+        cursor.execute("SELECT COUNT(*) FROM app_settings")
+        if cursor.fetchone()[0] == 0:
+            # Créer les paramètres par défaut
+            cursor.execute("""
+                INSERT INTO app_settings (company_name, company_address, company_phone, company_email)
+                VALUES ('Gestion-Frigo', '', '', '')
+            """)
+
+        conn.commit()
+
+    def _hash_password(self, password: str) -> str:
+        """Hash un mot de passe avec SHA-256."""
+        return hashlib.sha256(password.encode()).hexdigest()
+
+    def authenticate_user(self, username: str, password: str) -> Optional[User]:
+        """Authentifie un utilisateur."""
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        password_hash = self._hash_password(password)
+        cursor.execute("""
+            SELECT * FROM users
+            WHERE username = ? AND password_hash = ? AND is_active = 1
+        """, (username, password_hash))
+
+        row = cursor.fetchone()
+        if row:
+            # Mettre à jour last_login
+            cursor.execute("""
+                UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?
+            """, (row['id'],))
+            conn.commit()
+
+            return User(
+                id=row['id'],
+                username=row['username'],
+                password_hash=row['password_hash'],
+                full_name=row['full_name'],
+                role=row['role'],
+                is_active=bool(row['is_active']),
+                created_at=row['created_at'],
+                last_login=datetime.now()
+            )
+        return None
+
+    def add_user(self, user: User, password: str) -> int:
+        """Ajoute un nouvel utilisateur."""
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        password_hash = self._hash_password(password)
+        cursor.execute("""
+            INSERT INTO users (username, password_hash, full_name, role, is_active)
+            VALUES (?, ?, ?, ?, ?)
+        """, (user.username, password_hash, user.full_name, user.role, int(user.is_active)))
+
+        conn.commit()
+        return cursor.lastrowid
+
+    def get_all_users(self) -> List[User]:
+        """Récupère tous les utilisateurs."""
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM users ORDER BY username")
+        users = []
+        for row in cursor.fetchall():
+            users.append(User(
+                id=row['id'],
+                username=row['username'],
+                password_hash=row['password_hash'],
+                full_name=row['full_name'],
+                role=row['role'],
+                is_active=bool(row['is_active']),
+                created_at=row['created_at'],
+                last_login=row['last_login']
+            ))
+        return users
+
+    def update_user(self, user: User):
+        """Met à jour un utilisateur."""
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE users
+            SET full_name = ?, role = ?, is_active = ?
+            WHERE id = ?
+        """, (user.full_name, user.role, int(user.is_active), user.id))
+
+        conn.commit()
+
+    def change_user_password(self, user_id: int, new_password: str):
+        """Change le mot de passe d'un utilisateur."""
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        password_hash = self._hash_password(new_password)
+        cursor.execute("""
+            UPDATE users SET password_hash = ? WHERE id = ?
+        """, (password_hash, user_id))
+
+        conn.commit()
+
+    def delete_user(self, user_id: int):
+        """Supprime un utilisateur."""
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.commit()
+
+    # --- Gestion des paramètres ---
+
+    def get_app_settings(self) -> AppSettings:
+        """Récupère les paramètres de l'application."""
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM app_settings LIMIT 1")
+        row = cursor.fetchone()
+
+        if row:
+            return AppSettings(
+                id=row['id'],
+                company_name=row['company_name'],
+                company_address=row['company_address'],
+                company_phone=row['company_phone'],
+                company_email=row['company_email'],
+                logo_path=row['logo_path'],
+                primary_color=row['primary_color'],
+                show_address_on_receipt=bool(row['show_address_on_receipt']),
+                show_phone_on_receipt=bool(row['show_phone_on_receipt']),
+                show_email_on_receipt=bool(row['show_email_on_receipt']),
+                receipt_footer_text=row['receipt_footer_text'],
+                updated_at=row['updated_at']
+            )
+        else:
+            # Retourner les paramètres par défaut
+            return AppSettings()
+
+    def update_app_settings(self, settings: AppSettings):
+        """Met à jour les paramètres de l'application."""
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE app_settings
+            SET company_name = ?, company_address = ?, company_phone = ?,
+                company_email = ?, logo_path = ?, primary_color = ?,
+                show_address_on_receipt = ?, show_phone_on_receipt = ?,
+                show_email_on_receipt = ?, receipt_footer_text = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = 1
+        """, (settings.company_name, settings.company_address, settings.company_phone,
+              settings.company_email, settings.logo_path, settings.primary_color,
+              int(settings.show_address_on_receipt), int(settings.show_phone_on_receipt),
+              int(settings.show_email_on_receipt), settings.receipt_footer_text))
+
+        conn.commit()

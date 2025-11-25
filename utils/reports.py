@@ -33,12 +33,16 @@ class ReportGenerator:
         client = self.db.get_client(sale.client_id)
         items = self.db.get_sale_items(sale_id)
 
-        # Informations par défaut de l'entreprise (ne pas remplir si vide)
+        # Récupérer les paramètres de l'application
+        settings = self.db.get_app_settings()
+
+        # Utiliser les paramètres de l'application
         if not company_info:
             company_info = {
-                'name': 'Gestion-Frigo',
-                'address': '',
-                'phone': '',
+                'name': settings.company_name,
+                'address': settings.company_address if settings.show_address_on_receipt else '',
+                'phone': settings.company_phone if settings.show_phone_on_receipt else '',
+                'email': settings.company_email if settings.show_email_on_receipt else '',
             }
 
         # Créer le nom du fichier
@@ -99,6 +103,10 @@ class ReportGenerator:
         # Afficher téléphone seulement si rempli
         if company_info.get('phone') and company_info['phone'].strip():
             elements.append(Paragraph(f"Tél: {company_info['phone']}", small_style))
+
+        # Afficher email seulement si rempli
+        if company_info.get('email') and company_info['email'].strip():
+            elements.append(Paragraph(f"Email: {company_info['email']}", small_style))
 
         elements.append(Spacer(1, 3*mm))
 
@@ -207,7 +215,9 @@ class ReportGenerator:
         elements.append(footer_sep)
         elements.append(Spacer(1, 2*mm))
 
-        elements.append(Paragraph("Merci de votre visite !", center_style))
+        # Utiliser le texte de pied de page personnalisé
+        footer_text = settings.receipt_footer_text or "Merci de votre visite !"
+        elements.append(Paragraph(footer_text, center_style))
         elements.append(Paragraph("A bientôt", center_style))
         elements.append(Spacer(1, 2*mm))
         elements.append(Paragraph("Ce ticket fait office de facture", small_style))
