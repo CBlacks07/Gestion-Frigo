@@ -1,5 +1,7 @@
 """Gestionnaire de base de données SQLite."""
 import sqlite3
+import os
+import sys
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 from pathlib import Path
@@ -11,8 +13,21 @@ import hashlib
 class DatabaseManager:
     """Gestionnaire principal de la base de données."""
 
-    def __init__(self, db_path: str = "gestion_frigo.db"):
+    def __init__(self, db_path: str = None):
         """Initialise le gestionnaire de base de données."""
+        if db_path is None:
+            # Déterminer le meilleur emplacement pour la base de données
+            if getattr(sys, 'frozen', False):
+                # Si l'application est compilée avec PyInstaller
+                # Utiliser le dossier AppData de l'utilisateur
+                app_data = Path(os.environ.get('APPDATA', os.path.expanduser('~')))
+                db_dir = app_data / 'Gestion-Frigo'
+                db_dir.mkdir(parents=True, exist_ok=True)
+                db_path = str(db_dir / 'gestion_frigo.db')
+            else:
+                # En mode développement, utiliser le dossier courant
+                db_path = "gestion_frigo.db"
+
         self.db_path = db_path
         self.connection: Optional[sqlite3.Connection] = None
         self._create_tables()
