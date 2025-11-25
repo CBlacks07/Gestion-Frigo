@@ -65,6 +65,7 @@ class SetupWizard(QDialog):
 
         self.finish_btn = QPushButton("✅ Terminer l'installation")
         self.finish_btn.clicked.connect(self._finish_setup)
+        self.finish_btn.setDefault(True)  # Bouton par défaut pour la touche Entrée
         self.finish_btn.setStyleSheet("""
             QPushButton {
                 background-color: #27ae60;

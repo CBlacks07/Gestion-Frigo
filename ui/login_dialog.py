@@ -68,6 +68,7 @@ class LoginDialog(QDialog):
 
         self.login_btn = QPushButton("🔓 Se connecter")
         self.login_btn.setMinimumHeight(35)
+        self.login_btn.setDefault(True)  # Bouton par défaut pour la touche Entrée
         self.login_btn.clicked.connect(self._on_login)
         self.login_btn.setStyleSheet("""
             QPushButton {
