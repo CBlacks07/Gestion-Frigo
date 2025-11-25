@@ -30,16 +30,19 @@ def main():
     while True:
         # Afficher la page de connexion
         login_dialog = LoginDialog(db)
-        if login_dialog.exec() != LoginDialog.DialogCode.Accepted:
-            # L'utilisateur a annulé la connexion
+        result = login_dialog.exec()
+
+        # Si l'utilisateur annule la connexion (ferme la fenêtre)
+        if result != LoginDialog.DialogCode.Accepted:
+            # Quitter l'application
             return 0
 
         # Récupérer l'utilisateur connecté
         current_user = login_dialog.get_current_user()
 
+        # Si la connexion a échoué, recommencer la boucle de login
         if not current_user:
-            QMessageBox.critical(None, "Erreur", "Erreur lors de la connexion")
-            return 1
+            continue
 
         # Créer et afficher la fenêtre principale
         window = MainWindow(current_user)
