@@ -32,6 +32,9 @@ class MainWindow(QMainWindow):
         # Utilisateur connecté
         self.current_user = current_user
 
+        # Flag pour différencier déconnexion et fermeture
+        self.is_logout = False
+
         # Initialiser les gestionnaires
         self.db = DatabaseManager()
         self.alert_manager = AlertManager(self.db)
@@ -108,10 +111,13 @@ class MainWindow(QMainWindow):
         )
 
         if reply == QMessageBox.StandardButton.Yes:
-            # Fermer la fenêtre actuelle
-            self.close()
+            # Marquer que c'est une déconnexion (pas une fermeture normale)
+            self.is_logout = True
             # Émettre le signal de déconnexion
             self.logout_requested.emit()
+            # Fermer la fenêtre après un court délai pour permettre au signal d'être traité
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(100, self.close)
 
     def _show_about(self):
         """Affiche la fenêtre À propos."""
