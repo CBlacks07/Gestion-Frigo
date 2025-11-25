@@ -1,5 +1,8 @@
 """Widget de gestion des ventes et factures."""
 from datetime import datetime
+import os
+import subprocess
+import platform
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QDialog, QFormLayout, QLineEdit, QComboBox,
@@ -8,7 +11,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QColor
-import os
 
 from database.db_manager import DatabaseManager
 from database.models import Sale, SaleItem
@@ -77,7 +79,7 @@ class SalesWidget(QWidget):
             date_str = sale.sale_date.strftime('%d/%m/%Y %H:%M') if sale.sale_date else "-"
             self.sales_table.setItem(row, 2, QTableWidgetItem(date_str))
 
-            self.sales_table.setItem(row, 3, QTableWidgetItem(f"{sale.total_amount:.2f} €"))
+            self.sales_table.setItem(row, 3, QTableWidgetItem(f"{int(sale.total_amount)} CFA"))
 
             # Statut avec couleur
             status_item = QTableWidgetItem(self._get_status_label(sale.status))
@@ -159,9 +161,9 @@ class SalesWidget(QWidget):
         for item in items:
             product = self.db.get_product(item.product_id)
             product_name = product.name if product else f"Produit #{item.product_id}"
-            details += f"  • {product_name}: {item.quantity} x {item.unit_price:.2f}€ = {item.subtotal:.2f}€\n"
+            details += f"  • {product_name}: {int(item.quantity)} x {int(item.unit_price)} CFA = {int(item.subtotal)} CFA\n"
 
-        details += f"\nTotal: {sale.total_amount:.2f}€"
+        details += f"\nTotal: {int(sale.total_amount)} CFA"
 
         if sale.notes:
             details += f"\n\nNotes: {sale.notes}"
@@ -169,17 +171,35 @@ class SalesWidget(QWidget):
         QMessageBox.information(self, f"Détails de la vente #{sale.id}", details)
 
     def _generate_invoice(self, sale: Sale):
-        """Génère une facture PDF pour la vente."""
+        """Génère une facture PDF pour la vente et lance l'impression automatique."""
         try:
             pdf_path = self.report_generator.generate_invoice_pdf(sale.id)
-            QMessageBox.information(
-                self,
-                "Succès",
-                f"Facture générée avec succès!\n\nEmplacement: {pdf_path}"
-            )
 
-            # Ouvrir le fichier PDF si possible
+            # Impression automatique
             if os.path.exists(pdf_path):
+                system = platform.system()
+                try:
+                    if system == "Windows":
+                        # Windows: Utiliser l'imprimante par défaut
+                        os.startfile(pdf_path, "print")
+                    elif system == "Darwin":  # macOS
+                        subprocess.run(["lpr", pdf_path], check=False)
+                    else:  # Linux
+                        subprocess.run(["lp", pdf_path], check=False)
+
+                    QMessageBox.information(
+                        self,
+                        "Succès",
+                        f"Facture générée et envoyée à l'impression!\n\nEmplacement: {pdf_path}"
+                    )
+                except Exception as print_error:
+                    QMessageBox.warning(
+                        self,
+                        "Facture générée",
+                        f"Facture générée avec succès mais erreur d'impression: {str(print_error)}\n\nEmplacement: {pdf_path}"
+                    )
+
+                # Ouvrir le fichier PDF
                 os.system(f'xdg-open "{pdf_path}" 2>/dev/null || open "{pdf_path}" 2>/dev/null || start "{pdf_path}" 2>/dev/null')
 
         except Exception as e:
@@ -207,6 +227,8 @@ class SaleDialog(QDialog):
         form_layout = QFormLayout()
 
         self.client_combo = QComboBox()
+        self.client_combo.setEditable(True)
+        self.client_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         clients = self.db.get_all_clients()
         for client in clients:
             self.client_combo.addItem(f"{client.name} ({client.company or 'Particulier'})", client.id)
@@ -239,17 +261,19 @@ class SaleDialog(QDialog):
         add_item_layout = QHBoxLayout()
 
         self.product_combo = QComboBox()
+        self.product_combo.setEditable(True)
+        self.product_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         products = self.db.get_all_products()
         for product in products:
             self.product_combo.addItem(
-                f"{product.name} (Stock: {product.current_stock} {product.unit}) - {product.unit_price:.2f}€",
+                f"{product.name} (Stock: {int(product.current_stock)} {product.unit}) - {int(product.unit_price)} CFA",
                 product.id
             )
 
-        self.quantity_input = QDoubleSpinBox()
-        self.quantity_input.setMinimum(0.01)
-        self.quantity_input.setMaximum(99999.99)
-        self.quantity_input.setValue(1.0)
+        self.quantity_input = QSpinBox()
+        self.quantity_input.setMinimum(1)
+        self.quantity_input.setMaximum(999999)
+        self.quantity_input.setValue(1)
         self.quantity_input.setPrefix("Qté: ")
 
         add_item_btn = QPushButton("➕ Ajouter")
@@ -276,7 +300,7 @@ class SaleDialog(QDialog):
         layout.addWidget(items_group)
 
         # Total
-        self.total_label = QLabel("Total: 0.00 €")
+        self.total_label = QLabel("Total: 0 CFA")
         self.total_label.setStyleSheet("font-size: 16px; font-weight: bold; padding: 10px;")
         layout.addWidget(self.total_label)
 
@@ -307,7 +331,7 @@ class SaleDialog(QDialog):
             reply = QMessageBox.question(
                 self,
                 'Stock insuffisant',
-                f'Stock disponible: {product.current_stock} {product.unit}\n'
+                f'Stock disponible: {int(product.current_stock)} {product.unit}\n'
                 f'Quantité demandée: {quantity} {product.unit}\n\n'
                 'Voulez-vous continuer quand même?',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -328,7 +352,7 @@ class SaleDialog(QDialog):
         self.sale_items.append(item)
 
         # Ajouter à la liste
-        item_text = f"{product.name} - {quantity} {product.unit} x {product.unit_price:.2f}€ = {item.subtotal:.2f}€"
+        item_text = f"{product.name} - {quantity} {product.unit} x {int(product.unit_price)} CFA = {int(item.subtotal)} CFA"
         self.items_list.addItem(item_text)
 
         # Mettre à jour le total
@@ -345,7 +369,7 @@ class SaleDialog(QDialog):
     def _update_total(self):
         """Met à jour l'affichage du total."""
         total = sum(item.subtotal for item in self.sale_items)
-        self.total_label.setText(f"Total: {total:.2f} €")
+        self.total_label.setText(f"Total: {int(total)} CFA")
 
     def _validate_and_accept(self):
         """Valide les données avant d'accepter."""

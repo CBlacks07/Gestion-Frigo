@@ -162,7 +162,7 @@ class StatsWidget(QWidget):
 
         # Calculer le total des ventes
         total_sales = self.db.get_total_sales()
-        self.total_sales_label.setText(f"{total_sales:.2f} €")
+        self.total_sales_label.setText(f"{int(total_sales)} CFA")
 
         # Compter les ventes en attente
         all_sales = self.db.get_all_sales(limit=1000)
@@ -212,7 +212,7 @@ class StatsWidget(QWidget):
         else:
             html = "<ol>"
             for product_name, quantity in top_products:
-                html += f"<li><b>{product_name}</b>: {quantity:.2f} unités vendues</li>"
+                html += f"<li><b>{product_name}</b>: {int(quantity)} unités vendues</li>"
             html += "</ol>"
             self.top_products_text.setHtml(html)
 
@@ -225,7 +225,7 @@ class StatsWidget(QWidget):
         else:
             html = "<ol>"
             for client_name, total_spent in top_clients:
-                html += f"<li><b>{client_name}</b>: {total_spent:.2f} €</li>"
+                html += f"<li><b>{client_name}</b>: {int(total_spent)} CFA</li>"
             html += "</ol>"
             self.top_clients_text.setHtml(html)
 
@@ -238,10 +238,10 @@ class StatsWidget(QWidget):
             self.sales_period_text.setText(f"Aucune vente sur les {days} derniers jours.")
         else:
             total = sum(amount for _, amount in sales_by_period)
-            html = f"<p><b>Total sur la période: {total:.2f} €</b></p><ul>"
+            html = f"<p><b>Total sur la période: {int(total)} CFA</b></p><ul>"
 
             for date_str, amount in sales_by_period:
-                html += f"<li>{date_str}: {amount:.2f} €</li>"
+                html += f"<li>{date_str}: {int(amount)} CFA</li>"
 
             html += "</ul>"
             self.sales_period_text.setHtml(html)

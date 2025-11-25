@@ -125,10 +125,10 @@ class ReportGenerator:
 
             items_data.append([
                 product_name,
-                f"{item.quantity} {product.unit if product else ''}",
-                f"{item.unit_price:.2f} €",
-                f"{item.discount:.2f} €" if item.discount > 0 else "-",
-                f"{item.subtotal:.2f} €"
+                f"{int(item.quantity)} {product.unit if product else ''}",
+                f"{int(item.unit_price)} CFA",
+                f"{int(item.discount)} CFA" if item.discount > 0 else "-",
+                f"{int(item.subtotal)} CFA"
             ])
 
         items_table = Table(items_data, colWidths=[8*cm, 3*cm, 3*cm, 2*cm, 3*cm])
@@ -148,19 +148,17 @@ class ReportGenerator:
 
         # Total
         total_data = [
-            ['', '', '', 'Sous-total HT:', f"{sale.total_amount:.2f} €"],
-            ['', '', '', 'TVA (20%):', f"{sale.total_amount * 0.2:.2f} €"],
-            ['', '', '', 'TOTAL TTC:', f"{sale.total_amount * 1.2:.2f} €"],
+            ['', '', '', 'TOTAL:', f"{int(sale.total_amount)} CFA"],
         ]
 
         total_table = Table(total_data, colWidths=[8*cm, 3*cm, 3*cm, 2*cm, 3*cm])
         total_table.setStyle(TableStyle([
             ('ALIGN', (3, 0), (-1, -1), 'RIGHT'),
-            ('FONTNAME', (3, 2), (-1, 2), 'Helvetica-Bold'),
-            ('FONTSIZE', (3, 2), (-1, 2), 14),
-            ('LINEABOVE', (3, 2), (-1, 2), 2, colors.black),
-            ('BACKGROUND', (3, 2), (-1, 2), colors.HexColor('#3498db')),
-            ('TEXTCOLOR', (3, 2), (-1, 2), colors.whitesmoke),
+            ('FONTNAME', (3, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (3, 0), (-1, 0), 16),
+            ('LINEABOVE', (3, 0), (-1, 0), 2, colors.black),
+            ('BACKGROUND', (3, 0), (-1, 0), colors.HexColor('#3498db')),
+            ('TEXTCOLOR', (3, 0), (-1, 0), colors.whitesmoke),
         ]))
         elements.append(total_table)
 
@@ -247,8 +245,8 @@ class ReportGenerator:
             data.append([
                 product.name,
                 product.category or "-",
-                f"{product.current_stock} {product.unit}",
-                f"{product.min_stock} {product.unit}",
+                f"{int(product.current_stock)} {product.unit}",
+                f"{int(product.min_stock)} {product.unit}",
                 status
             ])
 

@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QDialog, QFormLayout, QLineEdit, QComboBox,
     QDateEdit, QTextEdit, QLabel, QMessageBox, QHeaderView, QGroupBox,
-    QDoubleSpinBox
+    QSpinBox
 )
 from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QColor
@@ -87,7 +87,7 @@ class StockWidget(QWidget):
             self.products_table.setItem(row, 2, QTableWidgetItem(product.category or "-"))
 
             # Stock actuel avec couleur
-            stock_item = QTableWidgetItem(f"{product.current_stock:.2f}")
+            stock_item = QTableWidgetItem(f"{int(product.current_stock)}")
             if product.current_stock == 0:
                 stock_item.setBackground(QColor("#e74c3c"))
                 stock_item.setForeground(QColor("white"))
@@ -95,8 +95,8 @@ class StockWidget(QWidget):
                 stock_item.setBackground(QColor("#f39c12"))
             self.products_table.setItem(row, 3, stock_item)
 
-            self.products_table.setItem(row, 4, QTableWidgetItem(f"{product.min_stock:.2f}"))
-            self.products_table.setItem(row, 5, QTableWidgetItem(f"{product.unit_price:.2f} €"))
+            self.products_table.setItem(row, 4, QTableWidgetItem(f"{int(product.min_stock)}"))
+            self.products_table.setItem(row, 5, QTableWidgetItem(f"{int(product.unit_price)} CFA"))
             self.products_table.setItem(row, 6, QTableWidgetItem(product.unit))
 
             # Boutons d'action
@@ -184,16 +184,18 @@ class ProductDialog(QDialog):
         self.category_input = QLineEdit()
         self.unit_combo = QComboBox()
         self.unit_combo.addItems(["kg", "g", "L", "mL", "pièce", "carton", "palette"])
-        self.current_stock_input = QDoubleSpinBox()
-        self.current_stock_input.setMaximum(999999.99)
-        self.min_stock_input = QDoubleSpinBox()
-        self.min_stock_input.setMaximum(999999.99)
-        self.unit_price_input = QDoubleSpinBox()
-        self.unit_price_input.setMaximum(999999.99)
-        self.unit_price_input.setPrefix("€ ")
+        self.current_stock_input = QSpinBox()
+        self.current_stock_input.setMaximum(999999)
+        self.min_stock_input = QSpinBox()
+        self.min_stock_input.setMaximum(999999)
+        self.unit_price_input = QSpinBox()
+        self.unit_price_input.setMaximum(999999999)
+        self.unit_price_input.setSuffix(" CFA")
 
-        # Fournisseur
+        # Fournisseur avec recherche
         self.supplier_combo = QComboBox()
+        self.supplier_combo.setEditable(True)
+        self.supplier_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self.supplier_combo.addItem("Aucun", None)
         suppliers = self.db.get_all_suppliers()
         for supplier in suppliers:
@@ -271,22 +273,24 @@ class StockMovementDialog(QDialog):
         layout = QFormLayout()
         self.setLayout(layout)
 
-        # Produit
+        # Produit avec recherche
         self.product_combo = QComboBox()
+        self.product_combo.setEditable(True)
+        self.product_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         products = self.db.get_all_products()
         for product in products:
             self.product_combo.addItem(
-                f"{product.name} (Stock: {product.current_stock} {product.unit})",
+                f"{product.name} (Stock: {int(product.current_stock)} {product.unit})",
                 product.id
             )
 
-        self.quantity_input = QDoubleSpinBox()
-        self.quantity_input.setMaximum(999999.99)
-        self.quantity_input.setMinimum(0.01)
+        self.quantity_input = QSpinBox()
+        self.quantity_input.setMaximum(999999)
+        self.quantity_input.setMinimum(1)
 
-        self.unit_price_input = QDoubleSpinBox()
-        self.unit_price_input.setMaximum(999999.99)
-        self.unit_price_input.setPrefix("€ ")
+        self.unit_price_input = QSpinBox()
+        self.unit_price_input.setMaximum(999999999)
+        self.unit_price_input.setSuffix(" CFA")
 
         self.expiration_date = QDateEdit()
         self.expiration_date.setDate(QDate.currentDate().addDays(30))
