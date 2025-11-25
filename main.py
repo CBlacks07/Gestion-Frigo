@@ -26,26 +26,45 @@ def main():
     # Initialiser la base de données
     db = DatabaseManager()
 
-    # Afficher la page de connexion
-    login_dialog = LoginDialog(db)
-    if login_dialog.exec() != LoginDialog.DialogCode.Accepted:
-        # L'utilisateur a annulé la connexion
-        return 0
+    # Boucle de connexion
+    while True:
+        # Afficher la page de connexion
+        login_dialog = LoginDialog(db)
+        if login_dialog.exec() != LoginDialog.DialogCode.Accepted:
+            # L'utilisateur a annulé la connexion
+            return 0
 
-    # Récupérer l'utilisateur connecté
-    current_user = login_dialog.get_current_user()
+        # Récupérer l'utilisateur connecté
+        current_user = login_dialog.get_current_user()
 
-    if not current_user:
-        QMessageBox.critical(None, "Erreur", "Erreur lors de la connexion")
-        return 1
+        if not current_user:
+            QMessageBox.critical(None, "Erreur", "Erreur lors de la connexion")
+            return 1
 
-    # Créer et afficher la fenêtre principale
-    window = MainWindow(current_user)
-    window.show()
+        # Créer et afficher la fenêtre principale
+        window = MainWindow(current_user)
 
-    # Lancer la boucle d'événements
-    sys.exit(app.exec())
+        # Connecter le signal de déconnexion
+        logout_requested = [False]  # Liste pour stocker l'état dans la closure
 
+        def on_logout():
+            logout_requested[0] = True
+
+        window.logout_requested.connect(on_logout)
+        window.show()
+
+        # Lancer la boucle d'événements
+        app.exec()
+
+        # Si déconnexion demandée, recommencer la boucle
+        if logout_requested[0]:
+            continue
+        else:
+            # Sinon, quitter l'application
+            break
+
+    return 0
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
+

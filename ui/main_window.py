@@ -1,10 +1,10 @@
 """Fenêtre principale de l'application."""
 from PyQt6.QtWidgets import (
     QMainWindow, QTabWidget, QWidget, QVBoxLayout,
-    QStatusBar, QMessageBox, QLabel
+    QStatusBar, QMessageBox, QLabel, QMenuBar, QMenu, QPushButton, QToolBar
 )
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QIcon, QAction, QPixmap
 
 from database.db_manager import DatabaseManager
 from database.models import User
@@ -22,6 +22,9 @@ from .settings_widget import SettingsWidget
 class MainWindow(QMainWindow):
     """Fenêtre principale de l'application."""
 
+    # Signal pour demander la déconnexion
+    logout_requested = pyqtSignal()
+
     def __init__(self, current_user: User):
         """Initialise la fenêtre principale."""
         super().__init__()
@@ -34,13 +37,25 @@ class MainWindow(QMainWindow):
         self.alert_manager = AlertManager(self.db)
         self.report_generator = ReportGenerator(self.db)
 
+        # Récupérer les paramètres
+        self.app_settings = self.db.get_app_settings()
+
         # Configuration de la fenêtre
-        app_settings = self.db.get_app_settings()
-        self.setWindowTitle(f"{app_settings.company_name} - Gestion de Stock")
+        self.setWindowTitle(f"{self.app_settings.company_name} - Gestion de Stock")
         self.setMinimumSize(1200, 800)
+
+        # Appliquer le logo si configuré
+        if self.app_settings.logo_path:
+            self.setWindowIcon(QIcon(self.app_settings.logo_path))
+
+        # Créer la barre de menu
+        self._create_menu()
 
         # Créer l'interface
         self._create_ui()
+
+        # Appliquer le style personnalisé
+        self._apply_custom_style()
 
         # Configurer la barre de statut
         self._setup_statusbar()
@@ -52,6 +67,108 @@ class MainWindow(QMainWindow):
 
         # Afficher les alertes au démarrage
         self._update_alerts()
+
+    def _create_menu(self):
+        """Crée la barre de menu."""
+        menubar = self.menuBar()
+
+        # Menu Fichier
+        file_menu = menubar.addMenu("📁 Fichier")
+
+        # Action déconnexion
+        logout_action = QAction("🚪 Déconnexion", self)
+        logout_action.setShortcut("Ctrl+Q")
+        logout_action.triggered.connect(self._logout)
+        file_menu.addAction(logout_action)
+
+        file_menu.addSeparator()
+
+        # Action quitter
+        exit_action = QAction("❌ Quitter", self)
+        exit_action.setShortcut("Alt+F4")
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+
+        # Menu Aide (si admin)
+        if self.current_user.role == "ADMIN":
+            help_menu = menubar.addMenu("❓ Aide")
+
+            about_action = QAction("ℹ️ À propos", self)
+            about_action.triggered.connect(self._show_about)
+            help_menu.addAction(about_action)
+
+    def _logout(self):
+        """Déconnecte l'utilisateur."""
+        reply = QMessageBox.question(
+            self,
+            'Confirmation de déconnexion',
+            'Êtes-vous sûr de vouloir vous déconnecter?',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            # Fermer la fenêtre actuelle
+            self.close()
+            # Émettre le signal de déconnexion
+            self.logout_requested.emit()
+
+    def _show_about(self):
+        """Affiche la fenêtre À propos."""
+        QMessageBox.about(
+            self,
+            "À propos",
+            f"<h2>{self.app_settings.company_name}</h2>"
+            f"<p><b>Gestion de Stock Professionnel</b></p>"
+            f"<p>Version 1.0.0</p>"
+            f"<p>Utilisateur connecté: {self.current_user.full_name}</p>"
+            f"<p>Rôle: {self.current_user.role}</p>"
+        )
+
+    def _apply_custom_style(self):
+        """Applique le style personnalisé avec la couleur principale."""
+        color = self.app_settings.primary_color
+
+        # Style CSS personnalisé
+        style = f"""
+        QTabWidget::pane {{
+            border: 1px solid #ddd;
+        }}
+        QTabBar::tab {{
+            background: #f0f0f0;
+            padding: 8px 15px;
+            margin: 2px;
+            border-radius: 5px 5px 0 0;
+        }}
+        QTabBar::tab:selected {{
+            background: {color};
+            color: white;
+            font-weight: bold;
+        }}
+        QTabBar::tab:hover {{
+            background: {color};
+            color: white;
+        }}
+        QPushButton {{
+            padding: 5px 10px;
+            border-radius: 3px;
+        }}
+        QGroupBox {{
+            font-weight: bold;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            margin-top: 10px;
+            padding-top: 10px;
+        }}
+        QGroupBox::title {{
+            subcontrol-origin: margin;
+            subcontrol-position: top left;
+            padding: 0 5px;
+            color: {color};
+        }}
+        """
+
+        self.setStyleSheet(style)
 
     def _create_ui(self):
         """Crée l'interface utilisateur."""
