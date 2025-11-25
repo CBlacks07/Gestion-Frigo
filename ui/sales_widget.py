@@ -1,5 +1,8 @@
 """Widget de gestion des ventes et factures."""
 from datetime import datetime
+import os
+import subprocess
+import platform
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QDialog, QFormLayout, QLineEdit, QComboBox,
@@ -12,7 +15,6 @@ from PyQt6.QtGui import QColor
 from database.db_manager import DatabaseManager
 from database.models import Sale, SaleItem
 from utils.reports import ReportGenerator
-from utils.html_printer import HTMLPrinter
 
 
 class SalesWidget(QWidget):
@@ -23,7 +25,6 @@ class SalesWidget(QWidget):
         super().__init__()
         self.db = db
         self.report_generator = report_generator
-        self.html_printer = HTMLPrinter(db, self)
         self._create_ui()
         self.refresh_data()
 
@@ -170,11 +171,39 @@ class SalesWidget(QWidget):
         QMessageBox.information(self, f"Détails de la vente #{sale.id}", details)
 
     def _generate_invoice(self, sale: Sale):
-        """Affiche l'aperçu d'impression du ticket de caisse."""
+        """Génère un ticket de caisse PDF et lance l'impression automatique."""
         try:
-            self.html_printer.print_receipt(sale.id)
+            pdf_path = self.report_generator.generate_receipt_pdf(sale.id)
+
+            # Impression automatique
+            if os.path.exists(pdf_path):
+                system = platform.system()
+                try:
+                    if system == "Windows":
+                        # Windows: Utiliser l'imprimante par défaut
+                        os.startfile(pdf_path, "print")
+                    elif system == "Darwin":  # macOS
+                        subprocess.run(["lpr", pdf_path], check=False)
+                    else:  # Linux
+                        subprocess.run(["lp", pdf_path], check=False)
+
+                    QMessageBox.information(
+                        self,
+                        "Succès",
+                        f"Ticket généré et envoyé à l'impression!\n\nEmplacement: {pdf_path}"
+                    )
+                except Exception as print_error:
+                    QMessageBox.warning(
+                        self,
+                        "Ticket généré",
+                        f"Ticket généré avec succès mais erreur d'impression: {str(print_error)}\n\nEmplacement: {pdf_path}"
+                    )
+
+                # Ouvrir le fichier PDF
+                os.system(f'xdg-open "{pdf_path}" 2>/dev/null || open "{pdf_path}" 2>/dev/null || start "{pdf_path}" 2>/dev/null')
+
         except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Erreur lors de l'impression du ticket: {str(e)}")
+            QMessageBox.critical(self, "Erreur", f"Erreur lors de la génération du ticket: {str(e)}")
 
 
 class SaleDialog(QDialog):

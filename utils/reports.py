@@ -6,9 +6,9 @@ from typing import List, Optional
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import cm
+from reportlab.lib.units import cm, mm
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 
 from database.models import Sale, SaleItem, Client, Invoice
 from database.db_manager import DatabaseManager
@@ -22,6 +22,200 @@ class ReportGenerator:
         self.db = db_manager
         self.output_dir = Path("exports")
         self.output_dir.mkdir(exist_ok=True)
+
+    def generate_receipt_pdf(self, sale_id: int, company_info: Optional[dict] = None) -> str:
+        """Génère un ticket de caisse PDF (format 80mm)."""
+        # Récupérer les données
+        sale = self.db.get_sale(sale_id)
+        if not sale:
+            raise ValueError(f"Vente {sale_id} introuvable")
+
+        client = self.db.get_client(sale.client_id)
+        items = self.db.get_sale_items(sale_id)
+
+        # Informations par défaut de l'entreprise (ne pas remplir si vide)
+        if not company_info:
+            company_info = {
+                'name': 'Gestion-Frigo',
+                'address': '',
+                'phone': '',
+            }
+
+        # Créer le nom du fichier
+        receipt_number = f"{sale_id:06d}"
+        filename = self.output_dir / f"ticket_{receipt_number}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+        # Créer le document PDF avec taille ticket (80mm de large)
+        doc = SimpleDocTemplate(
+            str(filename),
+            pagesize=(80*mm, 297*mm),  # 80mm de large, hauteur A4
+            rightMargin=2*mm,
+            leftMargin=2*mm,
+            topMargin=5*mm,
+            bottomMargin=5*mm
+        )
+
+        # Styles
+        styles = getSampleStyleSheet()
+
+        # Style pour l'en-tête
+        header_style = ParagraphStyle(
+            'ReceiptHeader',
+            parent=styles['Normal'],
+            fontSize=12,
+            fontName='Helvetica-Bold',
+            alignment=TA_CENTER,
+            spaceAfter=3
+        )
+
+        # Style normal centré
+        center_style = ParagraphStyle(
+            'Center',
+            parent=styles['Normal'],
+            fontSize=8,
+            alignment=TA_CENTER,
+            spaceAfter=2
+        )
+
+        # Style petit
+        small_style = ParagraphStyle(
+            'Small',
+            parent=styles['Normal'],
+            fontSize=7,
+            alignment=TA_CENTER,
+            spaceAfter=2
+        )
+
+        # Éléments du document
+        elements = []
+
+        # En-tête
+        elements.append(Paragraph(company_info['name'], header_style))
+
+        # Afficher adresse seulement si remplie
+        if company_info.get('address') and company_info['address'].strip():
+            elements.append(Paragraph(company_info['address'], small_style))
+
+        # Afficher téléphone seulement si rempli
+        if company_info.get('phone') and company_info['phone'].strip():
+            elements.append(Paragraph(f"Tél: {company_info['phone']}", small_style))
+
+        elements.append(Spacer(1, 3*mm))
+
+        # Ligne de séparation
+        sep_line = Table([['='*40]], colWidths=[76*mm])
+        sep_line.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Courier'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('ALIGNMENT', (0, 0), (-1, -1), 'CENTER'),
+        ]))
+        elements.append(sep_line)
+        elements.append(Spacer(1, 2*mm))
+
+        # Informations du ticket
+        elements.append(Paragraph(f"Ticket N°: {receipt_number}", center_style))
+        elements.append(Paragraph(
+            sale.sale_date.strftime('%d/%m/%Y %H:%M') if sale.sale_date else datetime.now().strftime('%d/%m/%Y %H:%M'),
+            center_style
+        ))
+
+        # Client seulement si existe
+        if client and client.name:
+            elements.append(Paragraph(f"Client: {client.name}", center_style))
+
+        # Mode de paiement
+        payment_labels = {
+            'CASH': 'Espèces',
+            'CARD': 'Carte',
+            'TRANSFER': 'Virement',
+            'CHECK': 'Chèque'
+        }
+        elements.append(Paragraph(f"Paiement: {payment_labels.get(sale.payment_method, sale.payment_method)}", center_style))
+
+        elements.append(Spacer(1, 2*mm))
+
+        # Ligne de séparation
+        elements.append(sep_line)
+        elements.append(Spacer(1, 2*mm))
+
+        # Articles
+        for item in items:
+            product = self.db.get_product(item.product_id)
+            product_name = product.name if product else f"Produit #{item.product_id}"
+
+            # Limiter le nom du produit
+            if len(product_name) > 30:
+                product_name = product_name[:27] + "..."
+
+            # Nom du produit
+            elements.append(Paragraph(product_name, styles['Normal']))
+
+            # Quantité x Prix = Total
+            item_detail = Table(
+                [[f"{int(item.quantity)} x {int(item.unit_price)} CFA", f"{int(item.subtotal)} CFA"]],
+                colWidths=[50*mm, 26*mm]
+            )
+            item_detail.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('ALIGNMENT', (0, 0), (0, 0), 'LEFT'),
+                ('ALIGNMENT', (1, 0), (1, 0), 'RIGHT'),
+                ('LEFTPADDING', (0, 0), (0, 0), 3*mm),
+                ('RIGHTPADDING', (1, 0), (1, 0), 0),
+            ]))
+            elements.append(item_detail)
+            elements.append(Spacer(1, 2*mm))
+
+        # Ligne de séparation double
+        double_sep = Table([['='*40]], colWidths=[76*mm])
+        double_sep.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Courier-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('ALIGNMENT', (0, 0), (-1, -1), 'CENTER'),
+        ]))
+        elements.append(double_sep)
+        elements.append(Spacer(1, 3*mm))
+
+        # Total
+        total_table = Table(
+            [['TOTAL A PAYER', f"{int(sale.total_amount)} CFA"]],
+            colWidths=[40*mm, 36*mm]
+        )
+        total_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 11),
+            ('ALIGNMENT', (0, 0), (0, 0), 'LEFT'),
+            ('ALIGNMENT', (1, 0), (1, 0), 'RIGHT'),
+        ]))
+        elements.append(total_table)
+        elements.append(Spacer(1, 3*mm))
+        elements.append(double_sep)
+
+        # Notes si présentes
+        if sale.notes and sale.notes.strip():
+            elements.append(Spacer(1, 3*mm))
+            elements.append(Paragraph(f"Note: {sale.notes}", small_style))
+
+        # Footer
+        elements.append(Spacer(1, 5*mm))
+        footer_sep = Table([['-'*40]], colWidths=[76*mm])
+        footer_sep.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Courier'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('ALIGNMENT', (0, 0), (-1, -1), 'CENTER'),
+        ]))
+        elements.append(footer_sep)
+        elements.append(Spacer(1, 2*mm))
+
+        elements.append(Paragraph("Merci de votre visite !", center_style))
+        elements.append(Paragraph("A bientôt", center_style))
+        elements.append(Spacer(1, 2*mm))
+        elements.append(Paragraph("Ce ticket fait office de facture", small_style))
+
+        # Générer le PDF
+        doc.build(elements)
+
+        return str(filename)
 
     def generate_invoice_pdf(self, sale_id: int, company_info: Optional[dict] = None) -> str:
         """Génère une facture PDF pour une vente."""
