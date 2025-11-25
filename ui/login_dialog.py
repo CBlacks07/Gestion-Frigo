@@ -61,12 +61,6 @@ class LoginDialog(QDialog):
         login_group.setLayout(login_layout)
         layout.addWidget(login_group)
 
-        # Message d'information
-        info_label = QLabel("ℹ️ Compte par défaut: admin / admin")
-        info_label.setStyleSheet("color: #7f8c8d; font-size: 11px;")
-        info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(info_label)
-
         layout.addSpacing(20)
 
         # Boutons

@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt
 from database.db_manager import DatabaseManager
 from ui.login_dialog import LoginDialog
 from ui.main_window import MainWindow
+from ui.setup_wizard import SetupWizard
 
 
 def main():
@@ -25,6 +26,15 @@ def main():
 
     # Initialiser la base de données
     db = DatabaseManager()
+
+    # Vérifier si c'est la première utilisation (aucun utilisateur)
+    if not db.has_users():
+        setup_wizard = SetupWizard(db)
+        result = setup_wizard.exec()
+
+        # Si l'utilisateur annule le setup, quitter l'application
+        if result != SetupWizard.DialogCode.Accepted:
+            return 0
 
     # Boucle de connexion
     while True:

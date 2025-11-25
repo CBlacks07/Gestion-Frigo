@@ -623,19 +623,9 @@ class DatabaseManager:
     # --- Gestion des utilisateurs ---
 
     def _initialize_default_data(self):
-        """Initialise les données par défaut (admin et paramètres)."""
+        """Initialise les données par défaut (paramètres uniquement)."""
         conn = self.connect()
         cursor = conn.cursor()
-
-        # Vérifier si l'utilisateur admin existe
-        cursor.execute("SELECT COUNT(*) FROM users WHERE username = 'admin'")
-        if cursor.fetchone()[0] == 0:
-            # Créer l'utilisateur admin par défaut (mot de passe: admin)
-            admin_password = self._hash_password("admin")
-            cursor.execute("""
-                INSERT INTO users (username, password_hash, full_name, role)
-                VALUES ('admin', ?, 'Administrateur', 'ADMIN')
-            """, (admin_password,))
 
         # Vérifier si les paramètres existent
         cursor.execute("SELECT COUNT(*) FROM app_settings")
@@ -647,6 +637,14 @@ class DatabaseManager:
             """)
 
         conn.commit()
+
+    def has_users(self) -> bool:
+        """Vérifie si au moins un utilisateur existe dans la base de données."""
+        conn = self.connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM users")
+        count = cursor.fetchone()[0]
+        return count > 0
 
     def _hash_password(self, password: str) -> str:
         """Hash un mot de passe avec SHA-256."""
@@ -683,16 +681,35 @@ class DatabaseManager:
             )
         return None
 
-    def add_user(self, user: User, password: str) -> int:
-        """Ajoute un nouvel utilisateur."""
+    def add_user(self, user_or_username, password: str, full_name: str = None,
+                 role: str = "USER", is_active: bool = True) -> int:
+        """Ajoute un nouvel utilisateur.
+
+        Args:
+            user_or_username: Soit un objet User, soit le nom d'utilisateur (str)
+            password: Le mot de passe de l'utilisateur
+            full_name: Le nom complet (requis si user_or_username est une str)
+            role: Le rôle de l'utilisateur (USER ou ADMIN)
+            is_active: Si l'utilisateur est actif
+        """
         conn = self.connect()
         cursor = conn.cursor()
+
+        # Si c'est un objet User, extraire les informations
+        if isinstance(user_or_username, User):
+            username = user_or_username.username
+            full_name = user_or_username.full_name
+            role = user_or_username.role
+            is_active = user_or_username.is_active
+        else:
+            # C'est un nom d'utilisateur (str)
+            username = user_or_username
 
         password_hash = self._hash_password(password)
         cursor.execute("""
             INSERT INTO users (username, password_hash, full_name, role, is_active)
             VALUES (?, ?, ?, ?, ?)
-        """, (user.username, password_hash, user.full_name, user.role, int(user.is_active)))
+        """, (username, password_hash, full_name, role, int(is_active)))
 
         conn.commit()
         return cursor.lastrowid
