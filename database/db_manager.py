@@ -844,3 +844,81 @@ class DatabaseManager:
               int(settings.show_email_on_receipt), settings.receipt_footer_text))
 
         conn.commit()
+
+    # --- Maintenance et réinitialisation ---
+
+    def reset_settings_to_default(self):
+        """Réinitialise les paramètres de l'application aux valeurs par défaut."""
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE app_settings
+            SET company_name = 'Gestion-Frigo',
+                company_address = '',
+                company_phone = '',
+                company_email = '',
+                logo_path = '',
+                primary_color = '#2980b9',
+                show_address_on_receipt = 1,
+                show_phone_on_receipt = 1,
+                show_email_on_receipt = 0,
+                receipt_footer_text = 'Merci de votre visite !',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = 1
+        """)
+
+        conn.commit()
+
+    def clear_all_data(self, keep_users: bool = True):
+        """Supprime toutes les données de l'application.
+
+        Args:
+            keep_users: Si True, conserve les utilisateurs et paramètres.
+                       Si False, supprime tout (réinitialisation complète).
+        """
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        # Supprimer les données transactionnelles
+        cursor.execute("DELETE FROM sale_items")
+        cursor.execute("DELETE FROM invoices")
+        cursor.execute("DELETE FROM sales")
+        cursor.execute("DELETE FROM stock_movements")
+        cursor.execute("DELETE FROM products")
+        cursor.execute("DELETE FROM clients")
+        cursor.execute("DELETE FROM suppliers")
+
+        if not keep_users:
+            # Réinitialisation complète : supprimer utilisateurs et paramètres
+            cursor.execute("DELETE FROM users")
+            cursor.execute("DELETE FROM app_settings")
+
+            # Recréer les paramètres par défaut
+            cursor.execute("""
+                INSERT INTO app_settings (company_name, company_address, company_phone, company_email)
+                VALUES ('Gestion-Frigo', '', '', '')
+            """)
+
+        conn.commit()
+
+    def create_database_backup(self) -> str:
+        """Crée une sauvegarde de la base de données.
+
+        Returns:
+            Le chemin du fichier de sauvegarde.
+        """
+        import shutil
+        from datetime import datetime
+
+        # Créer le nom du fichier de backup avec timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_dir = Path(self.db_path).parent / "backups"
+        backup_dir.mkdir(exist_ok=True)
+
+        backup_path = backup_dir / f"gestion_frigo_backup_{timestamp}.db"
+
+        # Copier le fichier de base de données
+        shutil.copy2(self.db_path, backup_path)
+
+        return str(backup_path)

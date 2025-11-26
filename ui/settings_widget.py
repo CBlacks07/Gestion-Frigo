@@ -53,6 +53,10 @@ class SettingsWidget(QWidget):
             self.users_tab = self._create_users_tab()
             self.tabs.addTab(self.users_tab, "👥 Utilisateurs")
 
+            # Onglet Maintenance (seulement pour admin)
+            self.maintenance_tab = self._create_maintenance_tab()
+            self.tabs.addTab(self.maintenance_tab, "⚙️ Maintenance")
+
         layout.addWidget(self.tabs)
 
         # Boutons
@@ -357,6 +361,267 @@ class SettingsWidget(QWidget):
                 QMessageBox.information(self, "Succès", "Utilisateur supprimé avec succès!")
             except Exception as e:
                 QMessageBox.critical(self, "Erreur", f"Erreur lors de la suppression: {str(e)}")
+
+    def _create_maintenance_tab(self) -> QWidget:
+        """Crée l'onglet de maintenance (admin uniquement)."""
+        widget = QWidget()
+        layout = QVBoxLayout()
+
+        # Titre avec avertissement
+        warning_label = QLabel(
+            "⚠️ ZONE DANGEREUSE ⚠️\n\n"
+            "Les actions ci-dessous sont irréversibles et peuvent supprimer des données.\n"
+            "Assurez-vous de créer une sauvegarde avant toute opération."
+        )
+        warning_label.setStyleSheet("""
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border: 2px solid #ffc107;
+            border-radius: 5px;
+            font-weight: bold;
+        """)
+        warning_label.setWordWrap(True)
+        layout.addWidget(warning_label)
+
+        layout.addSpacing(20)
+
+        # Section Sauvegarde
+        backup_group = QGroupBox("💾 Sauvegarde")
+        backup_layout = QVBoxLayout()
+
+        backup_info = QLabel("Créez une copie de sauvegarde de votre base de données.")
+        backup_layout.addWidget(backup_info)
+
+        backup_btn = QPushButton("📥 Créer une sauvegarde")
+        backup_btn.clicked.connect(self._create_backup)
+        backup_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #17a2b8;
+                color: white;
+                padding: 10px;
+                font-weight: bold;
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #138496;
+            }
+        """)
+        backup_layout.addWidget(backup_btn)
+
+        backup_group.setLayout(backup_layout)
+        layout.addWidget(backup_group)
+
+        layout.addSpacing(10)
+
+        # Section Réinitialisation
+        reset_group = QGroupBox("🔄 Réinitialisation")
+        reset_layout = QVBoxLayout()
+
+        # Bouton: Réinitialiser les paramètres
+        reset_settings_info = QLabel("Réinitialiser uniquement les paramètres (entreprise, apparence, tickets).")
+        reset_layout.addWidget(reset_settings_info)
+
+        reset_settings_btn = QPushButton("🔄 Réinitialiser les paramètres")
+        reset_settings_btn.clicked.connect(self._reset_settings)
+        reset_settings_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #ffc107;
+                color: #000;
+                padding: 10px;
+                font-weight: bold;
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #e0a800;
+            }
+        """)
+        reset_layout.addWidget(reset_settings_btn)
+
+        reset_layout.addSpacing(15)
+
+        # Bouton: Supprimer toutes les données (garder utilisateurs)
+        clear_data_info = QLabel(
+            "Supprimer toutes les données (produits, ventes, clients, fournisseurs).\n"
+            "Les utilisateurs et paramètres seront conservés."
+        )
+        clear_data_info.setWordWrap(True)
+        reset_layout.addWidget(clear_data_info)
+
+        clear_data_btn = QPushButton("🗑️ Supprimer toutes les données")
+        clear_data_btn.clicked.connect(self._clear_all_data)
+        clear_data_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #fd7e14;
+                color: white;
+                padding: 10px;
+                font-weight: bold;
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #dc6502;
+            }
+        """)
+        reset_layout.addWidget(clear_data_btn)
+
+        reset_layout.addSpacing(15)
+
+        # Bouton: Réinitialisation complète
+        full_reset_info = QLabel(
+            "⚠️ DANGER : Supprimer TOUTES les données, utilisateurs et paramètres.\n"
+            "L'application redémarrera au mode installation."
+        )
+        full_reset_info.setWordWrap(True)
+        full_reset_info.setStyleSheet("color: #721c24; font-weight: bold;")
+        reset_layout.addWidget(full_reset_info)
+
+        full_reset_btn = QPushButton("💣 Réinitialisation complète")
+        full_reset_btn.clicked.connect(self._full_reset)
+        full_reset_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                color: white;
+                padding: 10px;
+                font-weight: bold;
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #bd2130;
+            }
+        """)
+        reset_layout.addWidget(full_reset_btn)
+
+        reset_group.setLayout(reset_layout)
+        layout.addWidget(reset_group)
+
+        layout.addStretch()
+        widget.setLayout(layout)
+        return widget
+
+    def _create_backup(self):
+        """Crée une sauvegarde de la base de données."""
+        try:
+            backup_path = self.db.create_database_backup()
+            QMessageBox.information(
+                self,
+                "Sauvegarde créée",
+                f"La sauvegarde a été créée avec succès:\n\n{backup_path}"
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Erreur",
+                f"Erreur lors de la création de la sauvegarde:\n{str(e)}"
+            )
+
+    def _reset_settings(self):
+        """Réinitialise les paramètres aux valeurs par défaut."""
+        reply = QMessageBox.question(
+            self,
+            "Confirmer la réinitialisation",
+            "Êtes-vous sûr de vouloir réinitialiser tous les paramètres aux valeurs par défaut?\n\n"
+            "Cette action est irréversible.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                self.db.reset_settings_to_default()
+                self._load_settings()
+                QMessageBox.information(
+                    self,
+                    "Réinitialisation effectuée",
+                    "Les paramètres ont été réinitialisés aux valeurs par défaut."
+                )
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Erreur",
+                    f"Erreur lors de la réinitialisation:\n{str(e)}"
+                )
+
+    def _clear_all_data(self):
+        """Supprime toutes les données (garde utilisateurs)."""
+        reply = QMessageBox.warning(
+            self,
+            "⚠️ Confirmer la suppression",
+            "ATTENTION: Cette action va supprimer:\n"
+            "• Tous les produits\n"
+            "• Toutes les ventes\n"
+            "• Tous les clients\n"
+            "• Tous les fournisseurs\n"
+            "• Tous les mouvements de stock\n\n"
+            "Les utilisateurs et paramètres seront conservés.\n\n"
+            "Voulez-vous continuer?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                self.db.clear_all_data(keep_users=True)
+                QMessageBox.information(
+                    self,
+                    "Données supprimées",
+                    "Toutes les données ont été supprimées avec succès.\n"
+                    "Les utilisateurs et paramètres sont conservés."
+                )
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Erreur",
+                    f"Erreur lors de la suppression:\n{str(e)}"
+                )
+
+    def _full_reset(self):
+        """Réinitialisation complète de l'application."""
+        reply = QMessageBox.critical(
+            self,
+            "💣 DANGER: Réinitialisation complète",
+            "⚠️⚠️⚠️ ATTENTION ⚠️⚠️⚠️\n\n"
+            "Cette action va TOUT supprimer:\n"
+            "• Tous les produits, ventes, clients, fournisseurs\n"
+            "• TOUS les utilisateurs (y compris vous)\n"
+            "• TOUS les paramètres\n\n"
+            "L'application redémarrera en mode installation.\n\n"
+            "Êtes-vous ABSOLUMENT sûr?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            # Double confirmation
+            confirm = QMessageBox.warning(
+                self,
+                "Dernière confirmation",
+                "Tapez 'SUPPRIMER' pour confirmer la suppression totale.",
+                QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel
+            )
+
+            if confirm == QMessageBox.StandardButton.Ok:
+                try:
+                    self.db.clear_all_data(keep_users=False)
+                    QMessageBox.information(
+                        self,
+                        "Réinitialisation complète",
+                        "L'application a été réinitialisée.\n"
+                        "Veuillez redémarrer l'application."
+                    )
+                    # Fermer l'application
+                    import sys
+                    sys.exit(0)
+                except Exception as e:
+                    QMessageBox.critical(
+                        self,
+                        "Erreur",
+                        f"Erreur lors de la réinitialisation:\n{str(e)}"
+                    )
 
 
 class UserDialog(QDialog):
