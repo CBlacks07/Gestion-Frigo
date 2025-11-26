@@ -20,17 +20,31 @@ class DatabaseManager:
             if getattr(sys, 'frozen', False):
                 # Si l'application est compilée avec PyInstaller
                 # Utiliser le dossier AppData de l'utilisateur
-                app_data = Path(os.environ.get('APPDATA', os.path.expanduser('~')))
-                db_dir = app_data / 'Gestion-Frigo'
-                db_dir.mkdir(parents=True, exist_ok=True)
-                db_path = str(db_dir / 'gestion_frigo.db')
+                try:
+                    app_data = Path(os.environ.get('APPDATA', os.path.expanduser('~')))
+                    db_dir = app_data / 'Gestion-Frigo'
+                    db_dir.mkdir(parents=True, exist_ok=True)
+                    db_path = str(db_dir / 'gestion_frigo.db')
+                    print(f"Base de données: {db_path}")
+                except Exception as e:
+                    print(f"Erreur création répertoire DB: {e}")
+                    # Fallback: utiliser le répertoire temporaire
+                    import tempfile
+                    db_path = str(Path(tempfile.gettempdir()) / 'Gestion-Frigo' / 'gestion_frigo.db')
+                    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
             else:
                 # En mode développement, utiliser le dossier courant
                 db_path = "gestion_frigo.db"
 
         self.db_path = db_path
         self.connection: Optional[sqlite3.Connection] = None
-        self._create_tables()
+
+        try:
+            self._create_tables()
+        except Exception as e:
+            print(f"ERREUR lors de la création des tables: {e}")
+            print(f"Chemin de la base de données: {self.db_path}")
+            raise
 
     def connect(self) -> sqlite3.Connection:
         """Établit une connexion à la base de données."""
