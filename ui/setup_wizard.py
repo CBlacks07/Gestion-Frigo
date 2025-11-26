@@ -296,10 +296,10 @@ class SetupWizard(QDialog):
         try:
             # Créer le compte administrateur
             self.db.add_user(
-                username=username,
-                password=password,
-                full_name=fullname,
-                role="ADMIN"
+                username,      # user_or_username (positionnel)
+                password,      # password
+                fullname,      # full_name
+                "ADMIN"        # role
             )
 
             # Mettre à jour les paramètres de l'entreprise
