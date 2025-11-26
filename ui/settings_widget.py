@@ -364,7 +364,15 @@ class SettingsWidget(QWidget):
 
     def _create_maintenance_tab(self) -> QWidget:
         """Crée l'onglet de maintenance (admin uniquement)."""
-        widget = QWidget()
+        from PyQt6.QtWidgets import QScrollArea
+
+        # Conteneur principal avec scroll
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        # Widget de contenu
+        content_widget = QWidget()
         layout = QVBoxLayout()
 
         # Titre avec avertissement
@@ -387,7 +395,7 @@ class SettingsWidget(QWidget):
         layout.addSpacing(20)
 
         # Section Sauvegarde
-        backup_group = QGroupBox("💾 Sauvegarde")
+        backup_group = QGroupBox("💾 Sauvegarde et Restauration")
         backup_layout = QVBoxLayout()
 
         backup_info = QLabel("Créez une copie de sauvegarde de votre base de données.")
@@ -409,6 +417,28 @@ class SettingsWidget(QWidget):
             }
         """)
         backup_layout.addWidget(backup_btn)
+
+        backup_layout.addSpacing(10)
+
+        restore_info = QLabel("Restaurez une sauvegarde précédente de la base de données.")
+        backup_layout.addWidget(restore_info)
+
+        restore_btn = QPushButton("📤 Restaurer une sauvegarde")
+        restore_btn.clicked.connect(self._restore_backup)
+        restore_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                padding: 10px;
+                font-weight: bold;
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #5a6268;
+            }
+        """)
+        backup_layout.addWidget(restore_btn)
 
         backup_group.setLayout(backup_layout)
         layout.addWidget(backup_group)
@@ -499,8 +529,11 @@ class SettingsWidget(QWidget):
         layout.addWidget(reset_group)
 
         layout.addStretch()
-        widget.setLayout(layout)
-        return widget
+        content_widget.setLayout(layout)
+
+        # Ajouter le widget de contenu au scroll
+        scroll.setWidget(content_widget)
+        return scroll
 
     def _create_backup(self):
         """Crée une sauvegarde de la base de données."""
@@ -517,6 +550,127 @@ class SettingsWidget(QWidget):
                 "Erreur",
                 f"Erreur lors de la création de la sauvegarde:\n{str(e)}"
             )
+
+    def _restore_backup(self):
+        """Restaure une sauvegarde de la base de données."""
+        from PyQt6.QtWidgets import QFileDialog, QListWidget, QVBoxLayout, QPushButton
+
+        # Lister les sauvegardes disponibles
+        backups = self.db.list_backups()
+
+        if not backups:
+            QMessageBox.information(
+                self,
+                "Aucune sauvegarde",
+                "Aucune sauvegarde n'a été trouvée.\n"
+                "Créez d'abord une sauvegarde avant de pouvoir la restaurer."
+            )
+            return
+
+        # Créer un dialogue de sélection
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Sélectionner une sauvegarde à restaurer")
+        dialog.setMinimumWidth(600)
+        dialog.setMinimumHeight(400)
+
+        layout = QVBoxLayout()
+
+        info_label = QLabel(
+            "⚠️ ATTENTION: La restauration remplacera toutes les données actuelles par celles de la sauvegarde.\n"
+            "Sélectionnez la sauvegarde à restaurer:"
+        )
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("background-color: #fff3cd; padding: 10px; border-radius: 4px; margin-bottom: 10px;")
+        layout.addWidget(info_label)
+
+        # Liste des sauvegardes
+        backup_list = QListWidget()
+        for name, path, mod_time in backups:
+            date_str = mod_time.strftime("%d/%m/%Y %H:%M:%S")
+            item_text = f"{date_str} - {name}"
+            backup_list.addItem(item_text)
+            backup_list.item(backup_list.count() - 1).setData(Qt.ItemDataRole.UserRole, path)
+
+        layout.addWidget(backup_list)
+
+        # Boutons
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+
+        cancel_btn = QPushButton("Annuler")
+        cancel_btn.clicked.connect(dialog.reject)
+        button_layout.addWidget(cancel_btn)
+
+        restore_btn = QPushButton("Restaurer")
+        restore_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                color: white;
+                padding: 8px 16px;
+                font-weight: bold;
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+        """)
+        restore_btn.clicked.connect(lambda: self._perform_restore(dialog, backup_list))
+        button_layout.addWidget(restore_btn)
+
+        layout.addLayout(button_layout)
+        dialog.setLayout(layout)
+
+        dialog.exec()
+
+    def _perform_restore(self, dialog, backup_list):
+        """Effectue la restauration de la sauvegarde sélectionnée."""
+        current_item = backup_list.currentItem()
+
+        if not current_item:
+            QMessageBox.warning(
+                dialog,
+                "Aucune sélection",
+                "Veuillez sélectionner une sauvegarde à restaurer."
+            )
+            return
+
+        backup_path = current_item.data(Qt.ItemDataRole.UserRole)
+
+        # Confirmation
+        reply = QMessageBox.warning(
+            dialog,
+            "⚠️ Confirmer la restauration",
+            "ATTENTION: Cette action va:\n"
+            "• Remplacer TOUTES les données actuelles\n"
+            "• Utiliser les données de la sauvegarde sélectionnée\n\n"
+            "L'application sera redémarrée après la restauration.\n\n"
+            "Voulez-vous vraiment continuer?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                self.db.restore_database_backup(backup_path)
+                QMessageBox.information(
+                    dialog,
+                    "Restauration réussie",
+                    "La sauvegarde a été restaurée avec succès.\n"
+                    "L'application va maintenant redémarrer."
+                )
+                dialog.accept()
+
+                # Redémarrer l'application
+                import sys
+                sys.exit(0)
+
+            except Exception as e:
+                QMessageBox.critical(
+                    dialog,
+                    "Erreur",
+                    f"Erreur lors de la restauration:\n{str(e)}"
+                )
 
     def _reset_settings(self):
         """Réinitialise les paramètres aux valeurs par défaut."""

@@ -922,3 +922,47 @@ class DatabaseManager:
         shutil.copy2(self.db_path, backup_path)
 
         return str(backup_path)
+
+    def restore_database_backup(self, backup_path: str):
+        """Restaure une sauvegarde de la base de données.
+
+        Args:
+            backup_path: Chemin du fichier de sauvegarde à restaurer.
+        """
+        import shutil
+
+        # Vérifier que le fichier de sauvegarde existe
+        if not Path(backup_path).exists():
+            raise FileNotFoundError(f"Le fichier de sauvegarde n'existe pas: {backup_path}")
+
+        # Fermer la connexion actuelle
+        if self.connection:
+            self.connection.close()
+            self.connection = None
+
+        # Remplacer la base de données actuelle par la sauvegarde
+        shutil.copy2(backup_path, self.db_path)
+
+        # Reconnecter à la nouvelle base de données
+        self.connect()
+
+    def list_backups(self) -> list:
+        """Liste toutes les sauvegardes disponibles.
+
+        Returns:
+            Liste de tuples (nom_fichier, chemin_complet, date_modification)
+        """
+        backup_dir = Path(self.db_path).parent / "backups"
+
+        if not backup_dir.exists():
+            return []
+
+        backups = []
+        for backup_file in backup_dir.glob("gestion_frigo_backup_*.db"):
+            stat = backup_file.stat()
+            mod_time = datetime.fromtimestamp(stat.st_mtime)
+            backups.append((backup_file.name, str(backup_file), mod_time))
+
+        # Trier par date (plus récent en premier)
+        backups.sort(key=lambda x: x[2], reverse=True)
+        return backups
