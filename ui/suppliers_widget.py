@@ -30,6 +30,16 @@ class SuppliersWidget(QWidget):
         header_label.setStyleSheet("font-size: 18px; font-weight: bold; padding: 10px;")
         layout.addWidget(header_label)
 
+        # Champ de recherche
+        search_layout = QHBoxLayout()
+        search_label = QLabel("🔍 Rechercher:")
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Rechercher par nom, entreprise, email, téléphone...")
+        self.search_input.textChanged.connect(self._filter_table)
+        search_layout.addWidget(search_label)
+        search_layout.addWidget(self.search_input)
+        layout.addLayout(search_layout)
+
         # Boutons d'action
         button_layout = QHBoxLayout()
 
@@ -86,6 +96,24 @@ class SuppliersWidget(QWidget):
             action_layout.addStretch()
 
             self.suppliers_table.setCellWidget(row, 6, action_widget)
+
+    def _filter_table(self):
+        """Filtre la table selon le texte de recherche."""
+        search_text = self.search_input.text().lower()
+
+        for row in range(self.suppliers_table.rowCount()):
+            # Récupérer le texte de toutes les colonnes sauf la dernière (Actions)
+            row_text = ""
+            for col in range(self.suppliers_table.columnCount() - 1):
+                item = self.suppliers_table.item(row, col)
+                if item:
+                    row_text += item.text().lower() + " "
+
+            # Afficher ou cacher la ligne selon la recherche
+            if search_text in row_text:
+                self.suppliers_table.setRowHidden(row, False)
+            else:
+                self.suppliers_table.setRowHidden(row, True)
 
     def _add_supplier(self):
         """Ouvre le dialogue pour ajouter un fournisseur."""

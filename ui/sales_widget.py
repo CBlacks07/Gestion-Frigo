@@ -38,6 +38,38 @@ class SalesWidget(QWidget):
         header_label.setStyleSheet("font-size: 18px; font-weight: bold; padding: 10px;")
         layout.addWidget(header_label)
 
+        # Champ de recherche
+        search_layout = QHBoxLayout()
+        search_label = QLabel("🔍 Rechercher:")
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Rechercher par client, montant, statut...")
+        self.search_input.textChanged.connect(self._filter_table)
+        search_layout.addWidget(search_label)
+        search_layout.addWidget(self.search_input)
+        layout.addLayout(search_layout)
+
+        # Filtre par date
+        date_layout = QHBoxLayout()
+        date_layout.addWidget(QLabel("📅 Du:"))
+        self.date_from = QDateEdit()
+        self.date_from.setCalendarPopup(True)
+        self.date_from.setDate(QDate.currentDate().addMonths(-1))
+        self.date_from.dateChanged.connect(self._filter_table)
+        date_layout.addWidget(self.date_from)
+
+        date_layout.addWidget(QLabel("Au:"))
+        self.date_to = QDateEdit()
+        self.date_to.setCalendarPopup(True)
+        self.date_to.setDate(QDate.currentDate())
+        self.date_to.dateChanged.connect(self._filter_table)
+        date_layout.addWidget(self.date_to)
+
+        reset_dates_btn = QPushButton("🔄 Réinitialiser dates")
+        reset_dates_btn.clicked.connect(self._reset_dates)
+        date_layout.addWidget(reset_dates_btn)
+        date_layout.addStretch()
+        layout.addLayout(date_layout)
+
         # Boutons d'action
         button_layout = QHBoxLayout()
 
@@ -133,6 +165,48 @@ class SalesWidget(QWidget):
             'CHECK': 'Chèque'
         }
         return labels.get(payment, payment)
+
+    def _reset_dates(self):
+        """Réinitialise les filtres de date."""
+        self.date_from.setDate(QDate.currentDate().addMonths(-1))
+        self.date_to.setDate(QDate.currentDate())
+        self._filter_table()
+
+    def _filter_table(self):
+        """Filtre la table selon le texte de recherche et les dates."""
+        search_text = self.search_input.text().lower()
+        date_from = self.date_from.date().toPyDate()
+        date_to = self.date_to.date().toPyDate()
+
+        for row in range(self.sales_table.rowCount()):
+            show_row = True
+
+            # Filtre par texte de recherche
+            if search_text:
+                row_text = ""
+                for col in range(self.sales_table.columnCount() - 1):
+                    item = self.sales_table.item(row, col)
+                    if item:
+                        row_text += item.text().lower() + " "
+
+                if search_text not in row_text:
+                    show_row = False
+
+            # Filtre par date
+            if show_row:
+                date_item = self.sales_table.item(row, 2)  # Colonne Date
+                if date_item:
+                    date_text = date_item.text()
+                    try:
+                        # Parser la date au format DD/MM/YYYY HH:MM
+                        sale_date = datetime.strptime(date_text, '%d/%m/%Y %H:%M').date()
+                        if not (date_from <= sale_date <= date_to):
+                            show_row = False
+                    except:
+                        pass
+
+            # Afficher ou cacher la ligne
+            self.sales_table.setRowHidden(row, not show_row)
 
     def _new_sale(self):
         """Ouvre le dialogue pour créer une nouvelle vente."""
