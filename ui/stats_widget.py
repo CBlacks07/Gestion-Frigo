@@ -3,9 +3,10 @@ from datetime import datetime, timedelta
 import os
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QGroupBox, QGridLayout, QMessageBox, QComboBox, QTextEdit, QScrollArea
+    QGroupBox, QGridLayout, QMessageBox, QComboBox, QTextEdit, QScrollArea,
+    QDateEdit, QTableWidget, QTableWidgetItem, QHeaderView
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QFont
 
 from database.db_manager import DatabaseManager
@@ -140,6 +141,62 @@ class StatsWidget(QWidget):
         sales_period_group.setLayout(sales_period_layout)
         layout.addWidget(sales_period_group)
 
+        # Historique journalier des ventes
+        daily_history_group = QGroupBox("📅 Historique Journalier des Ventes")
+        daily_history_layout = QVBoxLayout()
+
+        # Sélecteur de date avec navigation
+        date_nav_layout = QHBoxLayout()
+
+        # Bouton jour précédent
+        self.prev_day_btn = QPushButton("◀ Jour précédent")
+        self.prev_day_btn.clicked.connect(self._prev_day)
+        date_nav_layout.addWidget(self.prev_day_btn)
+
+        # Sélecteur de date
+        date_nav_layout.addWidget(QLabel("Date:"))
+        self.daily_date_picker = QDateEdit()
+        self.daily_date_picker.setCalendarPopup(True)
+        self.daily_date_picker.setDate(QDate.currentDate())
+        self.daily_date_picker.setDisplayFormat("dd/MM/yyyy")
+        self.daily_date_picker.dateChanged.connect(self._update_daily_sales)
+        date_nav_layout.addWidget(self.daily_date_picker)
+
+        # Bouton jour suivant
+        self.next_day_btn = QPushButton("Jour suivant ▶")
+        self.next_day_btn.clicked.connect(self._next_day)
+        date_nav_layout.addWidget(self.next_day_btn)
+
+        # Bouton aujourd'hui
+        self.today_btn = QPushButton("📅 Aujourd'hui")
+        self.today_btn.clicked.connect(self._go_to_today)
+        date_nav_layout.addWidget(self.today_btn)
+
+        date_nav_layout.addStretch()
+
+        daily_history_layout.addLayout(date_nav_layout)
+
+        # Résumé du jour
+        self.daily_summary_label = QLabel()
+        self.daily_summary_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2980b9; padding: 10px;")
+        daily_history_layout.addWidget(self.daily_summary_label)
+
+        # Tableau des ventes du jour
+        self.daily_sales_table = QTableWidget()
+        self.daily_sales_table.setColumnCount(5)
+        self.daily_sales_table.setHorizontalHeaderLabels([
+            "Heure", "Client", "Montant Total", "Statut", "N° Facture"
+        ])
+        self.daily_sales_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.daily_sales_table.setAlternatingRowColors(True)
+        self.daily_sales_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.daily_sales_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.daily_sales_table.setMinimumHeight(250)
+        daily_history_layout.addWidget(self.daily_sales_table)
+
+        daily_history_group.setLayout(daily_history_layout)
+        layout.addWidget(daily_history_group)
+
         # Ajouter le widget de contenu dans un scroll area
         scroll_area = QScrollArea()
         scroll_area.setWidget(content_widget)
@@ -201,6 +258,9 @@ class StatsWidget(QWidget):
 
         # Afficher les ventes par période
         self._update_sales_period()
+
+        # Afficher l'historique journalier
+        self._update_daily_sales()
 
     def _update_alerts(self):
         """Met à jour l'affichage des alertes."""
@@ -275,3 +335,87 @@ class StatsWidget(QWidget):
 
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Erreur lors de la génération du rapport: {str(e)}")
+
+    def _prev_day(self):
+        """Affiche le jour précédent."""
+        current_date = self.daily_date_picker.date()
+        self.daily_date_picker.setDate(current_date.addDays(-1))
+
+    def _next_day(self):
+        """Affiche le jour suivant."""
+        current_date = self.daily_date_picker.date()
+        self.daily_date_picker.setDate(current_date.addDays(1))
+
+    def _go_to_today(self):
+        """Retourne à la date du jour."""
+        self.daily_date_picker.setDate(QDate.currentDate())
+
+    def _update_daily_sales(self):
+        """Met à jour l'affichage des ventes du jour sélectionné."""
+        selected_date = self.daily_date_picker.date().toPyDate()
+
+        # Récupérer toutes les ventes
+        all_sales = self.db.get_all_sales(limit=10000)
+
+        # Filtrer les ventes du jour sélectionné
+        daily_sales = []
+        for sale in all_sales:
+            sale_date = sale.sale_date.date() if isinstance(sale.sale_date, datetime) else sale.sale_date
+            if sale_date == selected_date:
+                daily_sales.append(sale)
+
+        # Vider le tableau
+        self.daily_sales_table.setRowCount(0)
+
+        # Calculer le résumé
+        total_amount = sum(sale.total_amount for sale in daily_sales)
+        paid_count = sum(1 for sale in daily_sales if sale.status == "PAID")
+        pending_count = sum(1 for sale in daily_sales if sale.status == "PENDING")
+
+        # Afficher le résumé
+        date_str = selected_date.strftime("%d/%m/%Y")
+        summary_text = f"📊 {date_str}: {len(daily_sales)} vente(s) - Total: {int(total_amount)} CFA"
+        if paid_count > 0 or pending_count > 0:
+            summary_text += f" (✅ {paid_count} payée(s), ⏳ {pending_count} en attente)"
+        self.daily_summary_label.setText(summary_text)
+
+        if not daily_sales:
+            # Afficher un message si aucune vente
+            self.daily_sales_table.setRowCount(1)
+            no_sales_item = QTableWidgetItem("Aucune vente enregistrée pour cette date")
+            no_sales_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.daily_sales_table.setSpan(0, 0, 1, 5)
+            self.daily_sales_table.setItem(0, 0, no_sales_item)
+            return
+
+        # Trier les ventes par heure (plus récentes en premier)
+        daily_sales.sort(key=lambda s: s.sale_date, reverse=True)
+
+        # Remplir le tableau
+        for sale in daily_sales:
+            row = self.daily_sales_table.rowCount()
+            self.daily_sales_table.insertRow(row)
+
+            # Heure
+            time_str = sale.sale_date.strftime("%H:%M") if isinstance(sale.sale_date, datetime) else "N/A"
+            self.daily_sales_table.setItem(row, 0, QTableWidgetItem(time_str))
+
+            # Client
+            client_name = sale.client_name if sale.client_id else "Client anonyme"
+            self.daily_sales_table.setItem(row, 1, QTableWidgetItem(client_name))
+
+            # Montant
+            amount_item = QTableWidgetItem(f"{int(sale.total_amount)} CFA")
+            amount_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.daily_sales_table.setItem(row, 2, amount_item)
+
+            # Statut
+            status_text = "✅ Payée" if sale.status == "PAID" else "⏳ En attente"
+            status_item = QTableWidgetItem(status_text)
+            if sale.status == "PAID":
+                status_item.setForeground(QFont().resolve(QFont()).defaultFamily())
+            self.daily_sales_table.setItem(row, 3, status_item)
+
+            # N° Facture
+            invoice_number = f"#{sale.id:04d}"
+            self.daily_sales_table.setItem(row, 4, QTableWidgetItem(invoice_number))
