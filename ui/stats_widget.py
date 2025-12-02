@@ -87,60 +87,6 @@ class StatsWidget(QWidget):
         kpi_group.setLayout(kpi_layout)
         layout.addWidget(kpi_group)
 
-        # Alertes critiques
-        alerts_group = QGroupBox("⚠️ Alertes Critiques")
-        alerts_layout = QVBoxLayout()
-        self.alerts_text = QTextEdit()
-        self.alerts_text.setReadOnly(True)
-        self.alerts_text.setMinimumHeight(150)
-        alerts_layout.addWidget(self.alerts_text)
-        alerts_group.setLayout(alerts_layout)
-        layout.addWidget(alerts_group)
-
-        # Produits les plus vendus
-        top_products_group = QGroupBox("🏆 Top 10 Produits les Plus Vendus")
-        top_products_layout = QVBoxLayout()
-        self.top_products_text = QTextEdit()
-        self.top_products_text.setReadOnly(True)
-        self.top_products_text.setMinimumHeight(150)
-        top_products_layout.addWidget(self.top_products_text)
-        top_products_group.setLayout(top_products_layout)
-        layout.addWidget(top_products_group)
-
-        # Meilleurs clients
-        top_clients_group = QGroupBox("👑 Top 10 Meilleurs Clients")
-        top_clients_layout = QVBoxLayout()
-        self.top_clients_text = QTextEdit()
-        self.top_clients_text.setReadOnly(True)
-        self.top_clients_text.setMinimumHeight(150)
-        top_clients_layout.addWidget(self.top_clients_text)
-        top_clients_group.setLayout(top_clients_layout)
-        layout.addWidget(top_clients_group)
-
-        # Ventes par période
-        sales_period_group = QGroupBox("📈 Ventes Récentes")
-        sales_period_layout = QVBoxLayout()
-
-        period_select_layout = QHBoxLayout()
-        period_select_layout.addWidget(QLabel("Période:"))
-        self.period_combo = QComboBox()
-        self.period_combo.addItem("7 derniers jours", 7)
-        self.period_combo.addItem("30 derniers jours", 30)
-        self.period_combo.addItem("90 derniers jours", 90)
-        self.period_combo.currentIndexChanged.connect(self._update_sales_period)
-        period_select_layout.addWidget(self.period_combo)
-        period_select_layout.addStretch()
-
-        sales_period_layout.addLayout(period_select_layout)
-
-        self.sales_period_text = QTextEdit()
-        self.sales_period_text.setReadOnly(True)
-        self.sales_period_text.setMinimumHeight(120)
-        sales_period_layout.addWidget(self.sales_period_text)
-
-        sales_period_group.setLayout(sales_period_layout)
-        layout.addWidget(sales_period_group)
-
         # Historique journalier des ventes
         daily_history_group = QGroupBox("📅 Historique Journalier des Ventes")
         daily_history_layout = QVBoxLayout()
@@ -196,6 +142,60 @@ class StatsWidget(QWidget):
 
         daily_history_group.setLayout(daily_history_layout)
         layout.addWidget(daily_history_group)
+
+        # Alertes critiques
+        alerts_group = QGroupBox("⚠️ Alertes Critiques")
+        alerts_layout = QVBoxLayout()
+        self.alerts_text = QTextEdit()
+        self.alerts_text.setReadOnly(True)
+        self.alerts_text.setMinimumHeight(150)
+        alerts_layout.addWidget(self.alerts_text)
+        alerts_group.setLayout(alerts_layout)
+        layout.addWidget(alerts_group)
+
+        # Produits les plus vendus
+        top_products_group = QGroupBox("🏆 Top 10 Produits les Plus Vendus")
+        top_products_layout = QVBoxLayout()
+        self.top_products_text = QTextEdit()
+        self.top_products_text.setReadOnly(True)
+        self.top_products_text.setMinimumHeight(150)
+        top_products_layout.addWidget(self.top_products_text)
+        top_products_group.setLayout(top_products_layout)
+        layout.addWidget(top_products_group)
+
+        # Meilleurs clients
+        top_clients_group = QGroupBox("👑 Top 10 Meilleurs Clients")
+        top_clients_layout = QVBoxLayout()
+        self.top_clients_text = QTextEdit()
+        self.top_clients_text.setReadOnly(True)
+        self.top_clients_text.setMinimumHeight(150)
+        top_clients_layout.addWidget(self.top_clients_text)
+        top_clients_group.setLayout(top_clients_layout)
+        layout.addWidget(top_clients_group)
+
+        # Ventes par période
+        sales_period_group = QGroupBox("📈 Ventes Récentes")
+        sales_period_layout = QVBoxLayout()
+
+        period_select_layout = QHBoxLayout()
+        period_select_layout.addWidget(QLabel("Période:"))
+        self.period_combo = QComboBox()
+        self.period_combo.addItem("7 derniers jours", 7)
+        self.period_combo.addItem("30 derniers jours", 30)
+        self.period_combo.addItem("90 derniers jours", 90)
+        self.period_combo.currentIndexChanged.connect(self._update_sales_period)
+        period_select_layout.addWidget(self.period_combo)
+        period_select_layout.addStretch()
+
+        sales_period_layout.addLayout(period_select_layout)
+
+        self.sales_period_text = QTextEdit()
+        self.sales_period_text.setReadOnly(True)
+        self.sales_period_text.setMinimumHeight(120)
+        sales_period_layout.addWidget(self.sales_period_text)
+
+        sales_period_group.setLayout(sales_period_layout)
+        layout.addWidget(sales_period_group)
 
         # Ajouter le widget de contenu dans un scroll area
         scroll_area = QScrollArea()
