@@ -53,14 +53,14 @@ class SalesWidget(QWidget):
         date_layout.addWidget(QLabel("📅 Du:"))
         self.date_from = QDateEdit()
         self.date_from.setCalendarPopup(True)
-        self.date_from.setDate(QDate.currentDate().addMonths(-1))
+        self.date_from.setDate(QDate.currentDate())  # Affichage par défaut: date du jour
         self.date_from.dateChanged.connect(self._filter_table)
         date_layout.addWidget(self.date_from)
 
         date_layout.addWidget(QLabel("Au:"))
         self.date_to = QDateEdit()
         self.date_to.setCalendarPopup(True)
-        self.date_to.setDate(QDate.currentDate())
+        self.date_to.setDate(QDate.currentDate())  # Affichage par défaut: date du jour
         self.date_to.dateChanged.connect(self._filter_table)
         date_layout.addWidget(self.date_to)
 
@@ -147,6 +147,9 @@ class SalesWidget(QWidget):
 
             self.sales_table.setCellWidget(row, 6, action_widget)
 
+        # Appliquer le filtre après le chargement des données
+        self._filter_table()
+
     def _get_status_label(self, status: str) -> str:
         """Retourne le label du statut."""
         labels = {
@@ -167,8 +170,8 @@ class SalesWidget(QWidget):
         return labels.get(payment, payment)
 
     def _reset_dates(self):
-        """Réinitialise les filtres de date."""
-        self.date_from.setDate(QDate.currentDate().addMonths(-1))
+        """Réinitialise les filtres de date au jour même."""
+        self.date_from.setDate(QDate.currentDate())
         self.date_to.setDate(QDate.currentDate())
         self._filter_table()
 
