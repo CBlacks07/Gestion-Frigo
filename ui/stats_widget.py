@@ -401,7 +401,11 @@ class StatsWidget(QWidget):
             self.daily_sales_table.setItem(row, 0, QTableWidgetItem(time_str))
 
             # Client
-            client_name = sale.client_name if sale.client_id else "Client anonyme"
+            if sale.client_id:
+                client = self.db.get_client(sale.client_id)
+                client_name = client.name if client else "Client inconnu"
+            else:
+                client_name = "Client anonyme"
             self.daily_sales_table.setItem(row, 1, QTableWidgetItem(client_name))
 
             # Montant
